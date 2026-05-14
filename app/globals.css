@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #060a0f;
+  --bg-card: #090d14;
+  --bg-raised: #0d1520;
+  --ice: #67e8f9;
+  --ice-dim: #22d3ee;
+  --ice-glow: #67e8f915;
+  --text: #f0f9ff;
+  --muted: #94a3b8;
+  --subtle: #475569;
+  --border: #0f1e2e;
+  --border-lit: #1e3a4f;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Geist', sans-serif;
+  overflow-x: hidden;
+}

@@ -1,0 +1,330 @@
+'use client'
+import { useEffect } from 'react'
+import Navbar from '@/components/Navbar'
+import Link from 'next/link'
+
+export default function Home() {
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible')
+          observer.unobserve(entry.target)
+        }
+      })
+    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' })
+    document.querySelectorAll('.reveal, .stagger-children').forEach(el => observer.observe(el))
+    return () => observer.disconnect()
+  }, [])
+
+  return (
+    <>
+      <style>{`
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(32px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes slideInRight {
+          from { opacity: 0; transform: translateX(40px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.4; }
+        }
+        .hero-left > * {
+          animation: fadeUp 0.7s cubic-bezier(0.22,1,0.36,1) forwards;
+          opacity: 0;
+        }
+        .hero-left > *:nth-child(1) { animation-delay: 0.05s; }
+        .hero-left > *:nth-child(2) { animation-delay: 0.18s; }
+        .hero-left > *:nth-child(3) { animation-delay: 0.30s; }
+        .hero-left > *:nth-child(4) { animation-delay: 0.42s; }
+        .hero-visual {
+          animation: slideInRight 0.9s cubic-bezier(0.22,1,0.36,1) 0.3s forwards;
+          opacity: 0;
+        }
+        .reveal {
+          opacity: 0;
+          transform: translateY(36px);
+          transition: opacity 0.7s cubic-bezier(0.22,1,0.36,1), transform 0.7s cubic-bezier(0.22,1,0.36,1);
+        }
+        .reveal.visible { opacity: 1; transform: translate(0,0); }
+        .stagger-children > * {
+          opacity: 0;
+          transform: translateY(28px);
+          transition: opacity 0.6s cubic-bezier(0.22,1,0.36,1), transform 0.6s cubic-bezier(0.22,1,0.36,1);
+        }
+        .stagger-children.visible > *:nth-child(1) { transition-delay: 0.00s; }
+        .stagger-children.visible > *:nth-child(2) { transition-delay: 0.08s; }
+        .stagger-children.visible > *:nth-child(3) { transition-delay: 0.16s; }
+        .stagger-children.visible > *:nth-child(4) { transition-delay: 0.24s; }
+        .stagger-children.visible > *:nth-child(5) { transition-delay: 0.32s; }
+        .stagger-children.visible > *:nth-child(6) { transition-delay: 0.40s; }
+        .stagger-children.visible > * { opacity: 1; transform: translateY(0); }
+        .pulse-dot { animation: pulse 2s infinite; }
+        body::before {
+          content: '';
+          position: fixed;
+          inset: 0;
+          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+          pointer-events: none;
+          z-index: 999;
+          opacity: 0.5;
+        }
+        .hero-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          align-items: center;
+          gap: 60px;
+          padding: 100px 40px 60px;
+          max-width: 1200px;
+          margin: 0 auto;
+          min-height: 100vh;
+        }
+        .stats-bar {
+          border-top: 1px solid #0f1e2e;
+          border-bottom: 1px solid #0f1e2e;
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+        }
+        .steps-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 1px;
+          background: #0f1e2e;
+          border: 1px solid #0f1e2e;
+          border-radius: 12px;
+          overflow: hidden;
+          margin-top: 56px;
+        }
+        .agents-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 16px;
+          margin-top: 56px;
+        }
+        .principles-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 1px;
+          background: #0f1e2e;
+          border: 1px solid #0f1e2e;
+          border-radius: 12px;
+          overflow: hidden;
+          margin-top: 56px;
+        }
+        .stack-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 12px;
+          margin-top: 48px;
+        }
+        @media (max-width: 900px) {
+          .hero-grid {
+            grid-template-columns: 1fr;
+            padding: 90px 20px 60px;
+            gap: 40px;
+            min-height: unset;
+          }
+          .stats-bar { grid-template-columns: repeat(2, 1fr); }
+          .stat-item { padding: 20px !important; }
+          .steps-grid { grid-template-columns: repeat(2, 1fr); }
+          .agents-grid { grid-template-columns: 1fr; }
+          .principles-grid { grid-template-columns: repeat(2, 1fr); }
+          .stack-grid { grid-template-columns: repeat(2, 1fr); }
+          .section-pad { padding: 60px 20px !important; }
+          .footer-bottom { flex-direction: column; gap: 16px; text-align: center; }
+        }
+      `}</style>
+
+      <Navbar />
+
+      {/* HERO */}
+      <div className="hero-grid">
+        <div className="hero-left">
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', fontFamily: "'Geist Mono', monospace", fontSize: '11px', color: '#67e8f9', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '28px' }}>
+            <span className="pulse-dot" style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#67e8f9', boxShadow: '0 0 8px #67e8f9', display: 'inline-block' }} />
+            Live on Arc Testnet
+          </div>
+          <h1 style={{ fontFamily: "'Instrument Serif', serif", fontSize: 'clamp(38px, 5vw, 56px)', lineHeight: 1.08, letterSpacing: '-0.02em', color: '#f0f9ff', marginBottom: '20px' }}>
+            Three agents.<br /><em style={{ fontStyle: 'italic', color: '#67e8f9' }}>One capital pool.</em><br />Every edge.
+          </h1>
+          <p style={{ color: '#94a3b8', fontSize: '15px', lineHeight: 1.7, maxWidth: '440px', marginBottom: '36px', fontWeight: 300 }}>
+            Flintex deploys three autonomous AI agents that share a single USDC wallet — rebalancing your portfolio, creating macro prediction markets, and sizing bets with Kelly Criterion. All settled on Arc in under a second.
+          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <Link href="#overview" style={{ background: 'none', border: '1px solid #1e3a4f', color: '#f0f9ff', padding: '9px 20px', borderRadius: '6px', fontSize: '13.5px', fontFamily: "'Geist', sans-serif", textDecoration: 'none' }}>
+              Read the docs
+            </Link>
+            <Link href="#agents" style={{ background: 'none', border: '1px solid #1e3a4f', color: '#94a3b8', padding: '9px 20px', borderRadius: '6px', fontSize: '13.5px', fontFamily: "'Geist', sans-serif", textDecoration: 'none' }}>
+              View agents
+            </Link>
+          </div>
+        </div>
+
+        <div className="hero-visual" style={{ display: 'flex', justifyContent: 'center' }}>
+          <div style={{ background: '#090d14', border: '1px solid #1e3a4f', borderRadius: '16px', padding: '28px', width: '100%', maxWidth: '360px', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: '-60px', right: '-60px', width: '180px', height: '180px', background: 'radial-gradient(circle, #67e8f915 0%, transparent 70%)', pointerEvents: 'none' }} />
+            <div style={{ fontFamily: "'Geist Mono', monospace", fontSize: '10px', color: '#475569', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '20px' }}>Flintex · Capital Pool · Arc Testnet</div>
+            <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: '42px', color: '#f0f9ff', letterSpacing: '-0.02em', marginBottom: '4px' }}>$24,850.00</div>
+            <div style={{ fontFamily: "'Geist Mono', monospace", fontSize: '12px', color: '#67e8f9', marginBottom: '28px' }}>↑ +3.2% · Regime: RISK-ON · USYC yield active</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {[
+                { name: 'PortfolioAgent', status: 'REBALANCING', alloc: '42%', color: '#67e8f9' },
+                { name: 'MarketAgent', status: '3 MARKETS OPEN', alloc: '31%', color: '#4ade80' },
+                { name: 'BetAgent', status: '2 +EV FOUND', alloc: '27%', color: '#60a5fa' },
+              ].map((agent) => (
+                <div key={agent.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#0d1520', borderRadius: '8px', border: '1px solid #0f1e2e' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: agent.color, boxShadow: `0 0 6px ${agent.color}`, display: 'inline-block', flexShrink: 0 }} />
+                    <span style={{ fontSize: '12.5px', color: '#f0f9ff' }}>{agent.name}</span>
+                  </div>
+                  <span style={{ fontFamily: "'Geist Mono', monospace", fontSize: '10.5px', color: '#94a3b8' }}>{agent.status}</span>
+                  <span style={{ fontFamily: "'Geist Mono', monospace", fontSize: '12px', color: '#67e8f9' }}>{agent.alloc}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* STATS BAR */}
+      <div className="stats-bar stagger-children">
+        {[
+          { label: 'Settlement time', value: '<1s', sub: 'Arc finality · deterministic' },
+          { label: 'Cost per tx', value: '~$0.01', sub: 'USDC · no volatile gas' },
+          { label: 'Active agents', value: '3', sub: 'Portfolio · Market · Bet' },
+          { label: 'Powered by', value: 'Circle', sub: 'Wallets · USYC · Gateway · CCTP' },
+        ].map((stat, i) => (
+          <div className="stat-item" key={i} style={{ padding: '28px 40px', borderRight: i < 3 ? '1px solid #0f1e2e' : 'none' }}>
+            <div style={{ fontFamily: "'Geist Mono', monospace", fontSize: '10px', color: '#475569', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '6px' }}>{stat.label}</div>
+            <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: '28px', color: '#f0f9ff', letterSpacing: '-0.02em' }}>{stat.value}</div>
+            <div style={{ fontSize: '11px', color: '#475569', marginTop: '2px', fontFamily: "'Geist Mono', monospace" }}>{stat.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* HOW IT WORKS */}
+      <section id="overview" className="section-pad" style={{ maxWidth: '1200px', margin: '0 auto', padding: '100px 40px' }}>
+        <div className="reveal" style={{ fontFamily: "'Geist Mono', monospace", fontSize: '10.5px', color: '#67e8f9', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '20px' }}>The flow</div>
+        <h2 className="reveal" style={{ fontFamily: "'Instrument Serif', serif", fontSize: 'clamp(28px, 3.5vw, 42px)', lineHeight: 1.1, letterSpacing: '-0.02em', color: '#f0f9ff', marginBottom: '16px', maxWidth: '640px' }}>Three agents. Zero manual decisions. Full market coverage.</h2>
+        <p className="reveal" style={{ color: '#94a3b8', fontSize: '15px', maxWidth: '520px', lineHeight: 1.7, fontWeight: 300 }}>Connect your wallet, fund with testnet USDC, and Flintex&apos;s agents go to work autonomously.</p>
+        <div className="steps-grid stagger-children">
+          {[
+            { num: '01', title: 'Connect & fund', desc: 'Connect your Circle Wallet or create one in-app. Deposit testnet USDC. The capital pool is shared across all three agents.' },
+            { num: '02', title: 'Agents activate', desc: 'PortfolioAgent scans your holdings. MarketAgent monitors macro news. BetAgent watches open prediction markets for mispricing.' },
+            { num: '03', title: 'AI allocates capital', desc: 'A master AI brain decides every cycle how to split USDC between the three strategies based on current opportunity scores.' },
+            { num: '04', title: 'Arc settles instantly', desc: 'Every rebalance, market creation, and bet executes on Arc. Sub-second finality. ~$0.01 fees in USDC. No waiting, no reorgs.' },
+          ].map((step) => (
+            <div key={step.num} style={{ background: '#090d14', padding: '28px 24px' }}>
+              <div style={{ fontFamily: "'Geist Mono', monospace", fontSize: '10px', color: '#475569', letterSpacing: '0.08em', marginBottom: '20px' }}>{step.num}</div>
+              <div style={{ fontSize: '14px', fontWeight: 500, color: '#f0f9ff', marginBottom: '10px' }}>{step.title}</div>
+              <p style={{ fontSize: '12.5px', color: '#94a3b8', lineHeight: 1.65, fontWeight: 300 }}>{step.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* AGENTS */}
+      <section id="agents" className="section-pad" style={{ maxWidth: '1200px', margin: '0 auto', padding: '100px 40px' }}>
+        <div className="reveal" style={{ fontFamily: "'Geist Mono', monospace", fontSize: '10.5px', color: '#67e8f9', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '20px' }}>The agents</div>
+        <h2 className="reveal" style={{ fontFamily: "'Instrument Serif', serif", fontSize: 'clamp(28px, 3.5vw, 42px)', lineHeight: 1.1, letterSpacing: '-0.02em', color: '#f0f9ff', marginBottom: '16px', maxWidth: '640px' }}>Each agent owns a job. All three share one wallet.</h2>
+        <p className="reveal" style={{ color: '#94a3b8', fontSize: '15px', maxWidth: '520px', lineHeight: 1.7, fontWeight: 300 }}>No silos. One USDC pool flows dynamically between three autonomous strategies.</p>
+        <div className="agents-grid stagger-children">
+          {[
+            { tag: 'RFB 4 · Portfolio', title: 'PortfolioAgent', desc: 'Monitors your holdings, detects market regime, rebalances automatically, and parks idle USDC in USYC during risk-off periods.', features: ['Regime detection (risk-on / risk-off)', 'Automatic rebalancing with reasoning log', 'USYC yield on idle capital', 'Cross-chain rebalancing via Gateway'] },
+            { tag: 'RFB 3 · Markets', title: 'MarketAgent', desc: 'Scans macro and geopolitical news in real time, identifies events worth betting on, and creates USDC prediction markets on Arc automatically.', features: ['Live news scanner with relevance scoring', 'Auto-creates markets: Fed, elections, CPI', 'USDC + EURC settlement support', 'Automated market resolution'] },
+            { tag: 'RFB 2 · Bets', title: 'BetAgent', desc: 'Finds mispriced prediction markets, calculates true probability estimates, and sizes positions optimally using the Kelly Criterion formula.', features: ['AI probability vs market-implied odds', 'Kelly Criterion position sizing', '+EV opportunity detection', 'Active position tracker with PnL'] },
+          ].map((agent) => (
+            <div key={agent.title} style={{ background: '#090d14', border: '1px solid #0f1e2e', borderRadius: '12px', padding: '32px 28px' }}>
+              <div style={{ fontFamily: "'Geist Mono', monospace", fontSize: '10px', color: '#67e8f9', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '16px' }}>{agent.tag}</div>
+              <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: '22px', color: '#f0f9ff', marginBottom: '12px', letterSpacing: '-0.01em' }}>{agent.title}</div>
+              <p style={{ fontSize: '13px', color: '#94a3b8', lineHeight: 1.7, fontWeight: 300, marginBottom: '24px' }}>{agent.desc}</p>
+              <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                {agent.features.map((f) => (
+                  <li key={f} style={{ fontSize: '12.5px', color: '#475569', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ color: '#67e8f9', fontSize: '11px' }}>→</span>{f}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* PRINCIPLES */}
+      <section className="section-pad" style={{ maxWidth: '1200px', margin: '0 auto', padding: '100px 40px' }}>
+        <div className="reveal" style={{ fontFamily: "'Geist Mono', monospace", fontSize: '10.5px', color: '#67e8f9', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '20px' }}>Principles</div>
+        <h2 className="reveal" style={{ fontFamily: "'Instrument Serif', serif", fontSize: 'clamp(28px, 3.5vw, 42px)', lineHeight: 1.1, letterSpacing: '-0.02em', color: '#f0f9ff', marginBottom: '56px' }}>Built for agents. Settled like a bank.</h2>
+        <div className="principles-grid stagger-children">
+          {[
+            { tag: 'Arc-native', title: 'Sub-second finality, every time' },
+            { tag: 'Circle Wallets', title: 'Embedded wallets, zero custody risk' },
+            { tag: 'USYC yield', title: 'Idle capital earns, always' },
+            { tag: 'Full autonomy', title: 'Agents decide, not humans' },
+          ].map((p) => (
+            <div key={p.tag} style={{ background: '#090d14', padding: '28px 24px' }}>
+              <div style={{ fontFamily: "'Geist Mono', monospace", fontSize: '9.5px', color: '#475569', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '12px' }}>{p.tag}</div>
+              <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: '17px', color: '#f0f9ff', lineHeight: 1.3 }}>{p.title}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* STACK */}
+      <section id="stack" className="section-pad" style={{ maxWidth: '1200px', margin: '0 auto', padding: '100px 40px' }}>
+        <div className="reveal" style={{ fontFamily: "'Geist Mono', monospace", fontSize: '10.5px', color: '#67e8f9', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '20px' }}>The stack</div>
+        <h2 className="reveal" style={{ fontFamily: "'Instrument Serif', serif", fontSize: 'clamp(28px, 3.5vw, 42px)', lineHeight: 1.1, letterSpacing: '-0.02em', color: '#f0f9ff', marginBottom: '16px' }}>{"Circle's full developer platform. On Arc."}</h2>
+        <p className="reveal" style={{ color: '#94a3b8', fontSize: '15px', maxWidth: '520px', lineHeight: 1.7, fontWeight: 300 }}>Flintex uses every primitive in the Circle stack to build the first three-agent market OS.</p>
+        <div className="stack-grid stagger-children">
+          {[
+            { label: 'Circle Wallets', title: 'Embedded wallet per user', desc: 'Every Flintex user gets a Circle Wallet. Agents operate from the same wallet, sharing one USDC pool.' },
+            { label: 'USYC', title: 'Yield on idle capital', desc: 'PortfolioAgent moves idle USDC to USYC during risk-off regimes. Capital works even when agents are waiting.' },
+            { label: 'Gateway', title: 'Unified cross-chain balance', desc: 'Fund Flintex from any chain. Gateway normalizes everything to Arc USDC in under 500ms.' },
+            { label: 'CCTP', title: 'Cross-chain USDC moves', desc: 'PortfolioAgent rebalances across chains using CCTP for multi-venue collateral movement.' },
+            { label: 'Paymaster', title: 'Gas fees in USDC', desc: 'No volatile gas tokens. Every agent transaction is fee-paid in USDC via Circle Paymaster.' },
+            { label: 'App Kit', title: 'Bridge · Swap · Send', desc: 'Drop-in components for bridging, swapping, and sending USDC directly inside the Flintex UI.' },
+          ].map((s) => (
+            <div key={s.label} style={{ background: '#090d14', border: '1px solid #0f1e2e', borderRadius: '10px', padding: '22px 20px' }}>
+              <div style={{ fontFamily: "'Geist Mono', monospace", fontSize: '9.5px', color: '#67e8f9', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '8px' }}>{s.label}</div>
+              <div style={{ fontSize: '13.5px', fontWeight: 500, color: '#f0f9ff', marginBottom: '6px' }}>{s.title}</div>
+              <p style={{ fontSize: '12px', color: '#475569', lineHeight: 1.6, fontWeight: 300 }}>{s.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* FOOTER CTA */}
+      <div id="docs" className="reveal" style={{ borderTop: '1px solid #0f1e2e', textAlign: 'center', padding: '100px 40px' }}>
+        <h2 style={{ fontFamily: "'Instrument Serif', serif", fontSize: 'clamp(32px, 4vw, 52px)', letterSpacing: '-0.02em', color: '#f0f9ff', marginBottom: '16px', lineHeight: 1.1 }}>
+          Build agents<br /><em style={{ fontStyle: 'italic', color: '#67e8f9' }}>that move markets.</em>
+        </h2>
+        <p style={{ color: '#94a3b8', fontSize: '15px', marginBottom: '36px', fontWeight: 300 }}>Connect your wallet and let Flintex&apos;s three agents go to work. Arc testnet. Real decisions. Zero gas tokens.</p>
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <Link href="/portfolio" style={{ background: '#67e8f9', color: '#060a0f', padding: '10px 22px', borderRadius: '6px', fontSize: '13.5px', fontWeight: 500, fontFamily: "'Geist', sans-serif", textDecoration: 'none' }}>Launch app →</Link>
+          <Link href="#overview" style={{ background: 'none', border: '1px solid #1e3a4f', color: '#f0f9ff', padding: '9px 20px', borderRadius: '6px', fontSize: '13.5px', fontFamily: "'Geist', sans-serif", textDecoration: 'none' }}>Read the docs</Link>
+        </div>
+      </div>
+
+      {/* FOOTER BOTTOM */}
+      <div className="footer-bottom" style={{ borderTop: '1px solid #0f1e2e', padding: '24px 40px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontFamily: "'Instrument Serif', serif", fontSize: '16px', color: '#94a3b8', textDecoration: 'none' }}>
+          <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
+            <path d="M16 2L28.7 9.5V24.5L16 32L3.3 24.5V9.5L16 2Z" fill="#0d1520" stroke="#67e8f9" strokeWidth="1"/>
+            <path d="M18 7L10 17H16L14 25L22 14H16L18 7Z" fill="#67e8f9"/>
+          </svg>
+          Flintex
+        </Link>
+        <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+          {['Overview', 'Docs', 'GitHub', 'X / Twitter'].map((l) => (
+            <Link key={l} href="#" style={{ fontSize: '12px', color: '#475569', textDecoration: 'none', fontFamily: "'Geist Mono', monospace" }}>{l}</Link>
+          ))}
+        </div>
+        <div style={{ fontFamily: "'Geist Mono', monospace", fontSize: '11px', color: '#475569' }}>
+          Powered by <span style={{ color: '#67e8f9' }}>Arc</span> · <span style={{ color: '#67e8f9' }}>Circle</span> · <span style={{ color: '#67e8f9' }}>Anthropic</span>
+        </div>
+      </div>
+    </>
+  )
+}
