@@ -1,6 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
+import { ConnectButton } from '@rainbow-me/rainbowkit'
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false)
@@ -22,8 +23,6 @@ export default function Navbar() {
         .nav-links a { color: #94a3b8; text-decoration: none; font-size: 13.5px; font-family: 'Geist', sans-serif; transition: color 0.2s; }
         .nav-links a:hover { color: #f0f9ff; }
         .nav-cta { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-        .nav-btn-ghost { background: none; border: 1px solid #1e3a4f; color: #94a3b8; padding: 7px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; font-family: 'Geist', sans-serif; white-space: nowrap; }
-        .nav-btn-primary { background: #67e8f9; color: #060a0f; padding: 8px 18px; border-radius: 6px; font-size: 13px; font-weight: 500; font-family: 'Geist', sans-serif; text-decoration: none; white-space: nowrap; }
         @media (max-width: 900px) {
           .navbar { padding: 0 20px; }
           .nav-links { display: none; }
@@ -48,8 +47,7 @@ export default function Navbar() {
         </ul>
 
         <div className="nav-cta">
-          <button className="nav-btn-ghost">Connect Wallet</button>
-          <Link href="/portfolio" className="nav-btn-primary">Launch app →</Link>
+          <ConnectButton />
         </div>
       </nav>
     </>
