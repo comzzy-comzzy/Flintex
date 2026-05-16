@@ -39,6 +39,7 @@ export default function Home() {
         .hero-left > *:nth-child(2) { animation-delay: 0.18s; }
         .hero-left > *:nth-child(3) { animation-delay: 0.30s; }
         .hero-left > *:nth-child(4) { animation-delay: 0.42s; }
+        .hero-left > *:nth-child(5) { animation-delay: 0.54s; }
         .hero-visual { animation: slideInRight 0.9s cubic-bezier(0.22,1,0.36,1) 0.3s forwards; opacity: 0; display: flex; justify-content: center; align-items: center; }
 
         .reveal { opacity: 0; transform: translateY(36px); transition: opacity 0.7s cubic-bezier(0.22,1,0.36,1), transform 0.7s cubic-bezier(0.22,1,0.36,1); }
@@ -59,6 +60,9 @@ export default function Home() {
         .hero h1 { font-family: 'Instrument Serif', serif; font-size: clamp(38px, 5vw, 56px); line-height: 1.08; letter-spacing: -0.02em; color: #f0f9ff; margin-bottom: 20px; }
         .hero h1 em { font-style: italic; color: #67e8f9; }
         .hero-sub { color: #94a3b8; font-size: 15px; line-height: 1.7; max-width: 440px; margin-bottom: 36px; font-weight: 300; }
+        .hero-tabs { display: inline-flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid #1e3a4f; border-radius: 8px; background: #090d14; margin-bottom: 20px; }
+        .hero-tab { color: #94a3b8; text-decoration: none; font-size: 13px; line-height: 1; padding: 10px 16px; border-radius: 6px; transition: color 0.2s, background 0.2s; }
+        .hero-tab:hover { color: #67e8f9; background: #0d1520; }
         .hero-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 
         .btn-ghost { background: none; border: 1px solid #1e3a4f; color: #94a3b8; padding: 7px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; font-family: 'Geist', sans-serif; transition: all 0.2s; }
@@ -106,8 +110,9 @@ export default function Home() {
         .step-desc { font-size: 12.5px; color: #94a3b8; line-height: 1.65; font-weight: 300; }
 
         .agents-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 56px; }
-        .agent-feature-card { background: #090d14; border: 1px solid #0f1e2e; border-radius: 12px; padding: 32px 28px; transition: border-color 0.2s; position: relative; overflow: hidden; }
+        .agent-feature-card { background: #090d14; border: 1px solid #0f1e2e; border-radius: 12px; padding: 32px 28px; transition: border-color 0.2s; position: relative; overflow: hidden; color: inherit; text-decoration: none; display: block; }
         .agent-feature-card:hover { border-color: #1e3a4f; }
+        .agent-feature-card:focus-visible { outline: 2px solid #67e8f9; outline-offset: 3px; }
         .agent-feature-card::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, #67e8f9, transparent); opacity: 0; transition: opacity 0.3s; }
         .agent-feature-card:hover::after { opacity: 1; }
         .afc-tag { font-family: 'Geist Mono', monospace; font-size: 10px; color: #67e8f9; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 16px; }
@@ -181,6 +186,11 @@ export default function Home() {
           <div className="hero-badge">Live on Arc Testnet</div>
           <h1>Three agents.<br /><em>One capital pool.</em><br />Every edge.</h1>
           <p className="hero-sub">Flintex deploys three autonomous AI agents that share a single USDC wallet — rebalancing your portfolio, creating macro prediction markets, and sizing bets with Kelly Criterion. All settled on Arc in under a second.</p>
+          <div className="hero-tabs" aria-label="Agent apps">
+            <Link href="/portfolio" className="hero-tab">Portfolio</Link>
+            <Link href="/markets" className="hero-tab">Markets</Link>
+            <Link href="/bets" className="hero-tab">Bets</Link>
+          </div>
           <div className="hero-actions">
             <Link href="#overview" className="btn-outline">Read the docs</Link>
             <Link href="#agents" className="btn-outline" style={{ color: '#94a3b8' }}>View agents</Link>
@@ -239,24 +249,24 @@ export default function Home() {
         <h2 className="section-title reveal">Each agent owns a job. All three share one wallet.</h2>
         <p className="section-sub reveal">No silos. One USDC pool flows dynamically between three autonomous strategies based on where the edge is highest right now.</p>
         <div className="agents-grid stagger-children">
-          <div className="agent-feature-card">
+          <Link href="/portfolio" className="agent-feature-card">
             <div className="afc-tag">RFB 4 · Portfolio</div>
             <div className="afc-title">PortfolioAgent</div>
             <p className="afc-desc">Monitors your holdings, detects market regime, rebalances automatically, and parks idle USDC in USYC during risk-off periods.</p>
             <ul className="afc-features"><li>Regime detection (risk-on / risk-off)</li><li>Automatic rebalancing with reasoning log</li><li>USYC yield on idle capital</li><li>Cross-chain rebalancing via Gateway</li></ul>
-          </div>
-          <div className="agent-feature-card">
+          </Link>
+          <Link href="/markets" className="agent-feature-card">
             <div className="afc-tag">RFB 3 · Markets</div>
             <div className="afc-title">MarketAgent</div>
             <p className="afc-desc">Scans macro and geopolitical news in real time, identifies events worth betting on, and creates USDC prediction markets on Arc automatically.</p>
             <ul className="afc-features"><li>Live news scanner with relevance scoring</li><li>Auto-creates markets: Fed, elections, CPI</li><li>USDC + EURC settlement support</li><li>Automated market resolution</li></ul>
-          </div>
-          <div className="agent-feature-card">
+          </Link>
+          <Link href="/bets" className="agent-feature-card">
             <div className="afc-tag">RFB 2 · Bets</div>
             <div className="afc-title">BetAgent</div>
             <p className="afc-desc">Finds mispriced prediction markets, calculates true probability estimates, and sizes positions optimally using the Kelly Criterion formula.</p>
             <ul className="afc-features"><li>AI probability vs market-implied odds</li><li>Kelly Criterion position sizing</li><li>+EV opportunity detection</li><li>Active position tracker with PnL</li></ul>
-          </div>
+          </Link>
         </div>
       </section>
 

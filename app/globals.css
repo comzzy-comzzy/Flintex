@@ -80,4 +80,19 @@ body {
 .connect-prompt h3 { font-family: 'Instrument Serif', serif; font-size: 24px; color: #f0f9ff; margin-bottom: 8px; }
 .connect-prompt p { color: #94a3b8; font-size: 14px; font-weight: 300; }
 .wallet-address { font-family: 'Geist Mono', monospace; font-size: 11px; color: #475569; margin-bottom: 12px; }
-@media (max-width: 768px) { .page { padding: 80px 20px 40px; } .grid-2{ grid-template-columns: 1fr; } }
+.dashboard-grid { display: grid; grid-template-columns: 1.4fr 0.8fr; gap: 20px; margin-bottom: 20px; }
+.dashboard-card-wide { min-width: 0; }
+.dashboard-log { height: 260px; }
+.market-list { display: flex; flex-direction: column; gap: 12px; }
+.market-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 16px; padding: 14px 16px; background: #060a0f; border: 1px solid #0f1e2e; border-radius: 8px; }
+.market-kicker { font-family: 'Geist Mono', monospace; font-size: 10px; color: #475569; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
+.market-title { color: #f0f9ff; font-size: 13.5px; line-height: 1.45; }
+.market-score { min-width: 72px; text-align: right; }
+.market-score span { display: block; font-family: 'Instrument Serif', serif; font-size: 28px; line-height: 1; color: #67e8f9; }
+.market-score small { display: block; margin-top: 5px; font-family: 'Geist Mono', monospace; font-size: 10px; color: #475569; text-transform: uppercase; }
+@media (max-width: 768px) {
+  .page { padding: 80px 20px 40px; }
+  .grid-2, .dashboard-grid { grid-template-columns: 1fr; }
+  .market-row { grid-template-columns: 1fr; }
+  .market-score { text-align: left; }
+}
