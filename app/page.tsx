@@ -192,7 +192,7 @@ export default function Home() {
             <Link href="/bets" className="hero-tab">Bets</Link>
           </div>
           <div className="hero-actions">
-            <Link href="#overview" className="btn-outline">Read the docs</Link>
+            <Link href="/docs" className="btn-outline">Read the docs</Link>
             <Link href="#agents" className="btn-outline" style={{ color: '#94a3b8' }}>View agents</Link>
           </div>
         </div>
@@ -278,7 +278,7 @@ export default function Home() {
             <h2 className="section-title">Three agents wired to one shared brain.</h2>
             <p className="section-sub">The master allocator runs every cycle — scoring opportunities across all three agents and splitting USDC to where the edge is sharpest. Every decision is logged onchain.</p>
             <br/>
-            <a href="#docs" style={{ fontFamily: "'Geist Mono', monospace", fontSize: '12px', color: '#67e8f9', textDecoration: 'none' }}>See the full architecture →</a>
+            <Link href="/docs#architecture" style={{ fontFamily: "'Geist Mono', monospace", fontSize: '12px', color: '#67e8f9', textDecoration: 'none' }}>See the full architecture →</Link>
           </div>
           <div className="code-block reveal reveal-right">
             <div className="code-header">
@@ -305,7 +305,7 @@ export default function Home() {
   allocation: alloc,
   paymaster: <span class="tok-str">'circle'</span>,
 });` }} />
-            <a href="#docs" className="code-link">SEE THE FULL REFERENCE →</a>
+            <Link href="/docs" className="code-link">SEE THE FULL REFERENCE →</Link>
           </div>
         </div>
       </section>
@@ -343,7 +343,7 @@ export default function Home() {
         <p>Connect your wallet and let Flintex&apos;s three agents go to work. Arc testnet. Real decisions. Zero gas tokens.</p>
         <div className="footer-cta-btns">
           <Link href="/portfolio" className="btn-primary-lg">Launch app →</Link>
-          <Link href="#overview" className="btn-outline">Read the docs</Link>
+          <Link href="/docs" className="btn-outline">Read the docs</Link>
         </div>
       </div>
 
@@ -357,10 +357,10 @@ export default function Home() {
           Flintex
         </Link>
         <div className="footer-links">
-          <Link href="#">Overview</Link>
-          <Link href="#">Docs</Link>
-          <Link href="#">GitHub</Link>
-          <Link href="#">X / Twitter</Link>
+          <Link href="/#overview">Overview</Link>
+          <Link href="/docs">Docs</Link>
+          <Link href="https://github.com/comzzy-comzzy/Flintex">GitHub</Link>
+          <Link href="https://x.com/kane_120">X / Twitter</Link>
         </div>
         <div className="footer-powered">
           Powered by <span>Arc</span> · <span>Circle</span> · <span>Anthropic</span>

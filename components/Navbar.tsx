@@ -9,7 +9,7 @@ const desktopLinks = [
   { label: 'Overview', href: '/#overview' },
   { label: 'Agents', href: '/#agents' },
   { label: 'Stack', href: '/#stack' },
-  { label: 'Docs', href: '/#docs' },
+  { label: 'Docs', href: '/docs' },
 ]
 
 const menuLinks = [
@@ -19,7 +19,7 @@ const menuLinks = [
   { label: 'BetAgent', href: '/bets', meta: 'Kelly sizing and edge monitor' },
   { label: 'Agents', href: '/#agents', meta: 'Three autonomous desks' },
   { label: 'Stack', href: '/#stack', meta: 'Arc, Circle Wallets, USDC rails' },
-  { label: 'Docs', href: '/#docs', meta: 'Architecture and launch reference' },
+  { label: 'Docs', href: '/docs', meta: 'Architecture and launch reference' },
 ]
 
 export default function Navbar() {
