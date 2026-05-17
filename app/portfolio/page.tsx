@@ -4,9 +4,10 @@ import Link from 'next/link'
 import { useState } from 'react'
 import Navbar from '@/components/Navbar'
 import { type Address, formatUnits, zeroAddress } from 'viem'
-import { useAccount, useReadContract } from 'wagmi'
+import { useAccount, useBalance, useReadContract } from 'wagmi'
 
-const TOKEN_DECIMALS = 6
+const NATIVE_USDC_DECIMALS = 18
+const ERC20_TOKEN_DECIMALS = 6
 
 const ERC20_BALANCE_ABI = [
   {
@@ -21,7 +22,6 @@ const ERC20_BALANCE_ABI = [
 const TOKENS = {
   usdc: {
     symbol: 'USDC',
-    address: '0x3600000000000000000000000000000000000000' as Address,
     valuePrefix: '$',
   },
   eurc: {
@@ -39,17 +39,17 @@ const TOKENS = {
 type Regime = 'ANALYZING' | 'RISK-ON' | 'RISK-OFF'
 type TokenBalance = bigint | undefined
 
-const formatTokenAmount = (balance: TokenBalance, decimals = 4) => {
-  if (balance === undefined) return `0.${'0'.repeat(decimals)}`
+const formatTokenAmount = (balance: TokenBalance, tokenDecimals: number, displayDecimals = 4) => {
+  if (balance === undefined) return `0.${'0'.repeat(displayDecimals)}`
 
-  const [whole, fraction = ''] = formatUnits(balance, TOKEN_DECIMALS).split('.')
-  return `${whole}.${fraction.padEnd(decimals, '0').slice(0, decimals)}`
+  const [whole, fraction = ''] = formatUnits(balance, tokenDecimals).split('.')
+  return `${whole}.${fraction.padEnd(displayDecimals, '0').slice(0, displayDecimals)}`
 }
 
-const formatTokenValue = (balance: TokenBalance, prefix: string) => {
+const formatTokenValue = (balance: TokenBalance, tokenDecimals: number, prefix: string) => {
   if (balance === undefined) return `${prefix}0.00`
 
-  const [whole, fraction = ''] = formatUnits(balance, TOKEN_DECIMALS).split('.')
+  const [whole, fraction = ''] = formatUnits(balance, tokenDecimals).split('.')
   return `${prefix}${whole}.${fraction.padEnd(2, '0').slice(0, 2)}`
 }
 
@@ -62,11 +62,8 @@ export default function PortfolioPage() {
   const [log, setLog] = useState<string[]>([])
   const [usycAlloc, setUsycAlloc] = useState(0)
 
-  const usdcBalance = useReadContract({
-    address: TOKENS.usdc.address,
-    abi: ERC20_BALANCE_ABI,
-    functionName: 'balanceOf',
-    args: [address ?? zeroAddress],
+  const usdcBalance = useBalance({
+    address,
     query: { enabled: Boolean(address) },
   })
 
@@ -89,18 +86,18 @@ export default function PortfolioPage() {
   const portfolio = [
     {
       asset: TOKENS.usdc.symbol,
-      amount: formatTokenAmount(usdcBalance.data),
-      value: formatTokenValue(usdcBalance.data, TOKENS.usdc.valuePrefix),
+      amount: formatTokenAmount(usdcBalance.data?.value, NATIVE_USDC_DECIMALS),
+      value: formatTokenValue(usdcBalance.data?.value, NATIVE_USDC_DECIMALS, TOKENS.usdc.valuePrefix),
     },
     {
       asset: TOKENS.eurc.symbol,
-      amount: formatTokenAmount(eurcBalance.data),
-      value: formatTokenValue(eurcBalance.data, TOKENS.eurc.valuePrefix),
+      amount: formatTokenAmount(eurcBalance.data, ERC20_TOKEN_DECIMALS),
+      value: formatTokenValue(eurcBalance.data, ERC20_TOKEN_DECIMALS, TOKENS.eurc.valuePrefix),
     },
     {
       asset: TOKENS.usyc.symbol,
-      amount: formatTokenAmount(usycBalance.data),
-      value: formatTokenValue(usycBalance.data, TOKENS.usyc.valuePrefix),
+      amount: formatTokenAmount(usycBalance.data, ERC20_TOKEN_DECIMALS),
+      value: formatTokenValue(usycBalance.data, ERC20_TOKEN_DECIMALS, TOKENS.usyc.valuePrefix),
     },
   ]
 
