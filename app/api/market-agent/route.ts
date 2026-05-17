@@ -97,7 +97,20 @@ const decodeXmlEntities = (value: string) => value
   .replace(/&lt;/g, '<')
   .replace(/&gt;/g, '>')
 
-const stripXml = (value: string) => decodeXmlEntities(value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim())
+const stripXml = (value: string) => {
+  let decoded = value
+
+  for (let index = 0; index < 2; index += 1) {
+    decoded = decodeXmlEntities(decoded)
+  }
+
+  return decoded
+    .replace(/<a\b[^>]*>[\s\S]*?<\/a>/gi, ' ')
+    .replace(/<font\b[^>]*>[\s\S]*?<\/font>/gi, ' ')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
 
 const extractTag = (item: string, tag: string) => {
   const match = item.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i'))

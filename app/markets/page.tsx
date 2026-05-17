@@ -27,6 +27,8 @@ type FeedItem = {
   time: string
 }
 
+type ScanState = 'READY' | 'SCANNING' | 'COMPLETE' | 'ERROR'
+
 const initialMarkets: MarketDraft[] = [
   {
     title: 'FOMC keeps rates unchanged',
@@ -96,13 +98,27 @@ const formatFeedTime = (value: unknown) => {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
+const cleanFeedText = (value: unknown, fallback: string) => {
+  if (typeof value !== 'string') return fallback
+
+  const cleaned = value
+    .replace(/<a\b[^>]*>[\s\S]*?<\/a>/gi, ' ')
+    .replace(/<font\b[^>]*>[\s\S]*?<\/font>/gi, ' ')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  return cleaned || fallback
+}
+
 export default function MarketsPage() {
   const { isConnected } = useAccount()
   const [loading, setLoading] = useState(false)
+  const [scanState, setScanState] = useState<ScanState>('READY')
   const [feed, setFeed] = useState(initialFeed)
   const [markets, setMarkets] = useState(initialMarkets)
   const [agentLog, setAgentLog] = useState<string[]>([
-    'MarketAgent idle. Connect a wallet to start scanning.',
+    'MarketAgent ready. Click Run MarketAgent to scan live macro news.',
   ])
   const [form, setForm] = useState<MarketFormState>(emptyForm)
 
@@ -112,6 +128,7 @@ export default function MarketsPage() {
     if (!isConnected) return
 
     setLoading(true)
+    setScanState('SCANNING')
     setAgentLog(['Scanning real macro and geopolitical news...'])
 
     try {
@@ -129,9 +146,9 @@ export default function MarketsPage() {
       const nextMarkets: MarketDraft[] = Array.isArray(data.markets) ? data.markets.map(normalizeMarket) : []
       const nextFeed: FeedItem[] = Array.isArray(data.newsItems)
         ? data.newsItems.map((item: Record<string, unknown>) => ({
-          source: typeof item.source === 'string' && item.source.trim() ? item.source.trim() : 'Macro News',
-          headline: typeof item.title === 'string' && item.title.trim() ? item.title.trim() : 'Macro event detected',
-          summary: typeof item.description === 'string' && item.description.trim() ? item.description.trim() : 'MarketAgent included this event in the scan.',
+          source: cleanFeedText(item.source, 'Macro News'),
+          headline: cleanFeedText(item.title, 'Macro event detected'),
+          summary: cleanFeedText(item.description, 'MarketAgent included this event in the scan.'),
           time: formatFeedTime(item.publishedAt),
         }))
         : []
@@ -140,23 +157,18 @@ export default function MarketsPage() {
         setMarkets(nextMarkets)
       }
 
-      setFeed((current) => [
-        {
-          source: 'MarketAgent',
-          headline: 'New market batch created from live news scan',
-          summary: `${data.fallback ? 'Loaded fallback drafts after a model parse issue.' : `Generated ${nextMarkets.length} candidate markets from the latest macro read.`}`,
-          time: 'just now',
-        },
-        ...nextFeed,
-        ...current,
-      ].slice(0, 6))
+      if (nextFeed.length > 0) {
+        setFeed(nextFeed.slice(0, 6))
+      }
 
+      setScanState('COMPLETE')
       setAgentLog([
         data.fallback ? 'MarketAgent used fallback market drafts.' : `MarketAgent returned ${nextMarkets.length} markets.`,
         `Scanned ${nextFeed.length} macro and geopolitical headlines.`,
         'Draft liquidity assigned for top-ranked events.',
       ])
     } catch {
+      setScanState('ERROR')
       setAgentLog([
         'MarketAgent request failed.',
         'Falling back to existing market drafts.',
@@ -165,6 +177,9 @@ export default function MarketsPage() {
       setLoading(false)
     }
   }
+
+  const scanLabel = scanState === 'READY' ? 'READY TO SCAN' : scanState === 'COMPLETE' ? 'SCAN COMPLETE' : scanState
+  const scanClass = scanState === 'ERROR' ? 'regime-off' : scanState === 'COMPLETE' ? 'regime-on' : 'regime-analyzing'
 
   const handleManualCreate = () => {
     if (!form.title.trim() || !form.description.trim() || !form.resolutionCriteria.trim() || !form.deadline.trim()) return
@@ -214,9 +229,9 @@ export default function MarketsPage() {
             <div className="grid-2">
               <div className="card page-anim page-anim-3">
                 <div className="card-title">News Scan</div>
-                <div className="regime-badge regime-analyzing">
+                <div className={`regime-badge ${scanClass}`}>
                   <span className="regime-dot"></span>
-                  SCANNING
+                  {scanLabel}
                 </div>
                 <div className="allocation-section">
                   <div className="card-title">Live Coverage</div>
@@ -267,10 +282,6 @@ export default function MarketsPage() {
                         <div className="market-kicker">{item.source} · {item.time}</div>
                         <div className="market-title">{item.headline}</div>
                         <div className="page-sub" style={{ marginTop: '6px' }}>{item.summary}</div>
-                      </div>
-                      <div className="market-score">
-                        <span>AI</span>
-                        <small>scan</small>
                       </div>
                     </div>
                   ))}
