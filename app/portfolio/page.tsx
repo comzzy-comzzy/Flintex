@@ -37,7 +37,7 @@ const TOKENS = {
   },
 } as const
 
-type Regime = 'ANALYZING' | 'RISK-ON' | 'RISK-OFF'
+type Regime = 'READY' | 'ANALYZING' | 'RISK-ON' | 'RISK-OFF'
 type TokenBalance = bigint | undefined
 
 const formatTokenAmount = (balance: TokenBalance, tokenDecimals: number, displayDecimals = 4) => {
@@ -58,7 +58,7 @@ const clampAllocation = (value: number) => Math.min(100, Math.max(0, Math.round(
 
 export default function PortfolioPage() {
   const { address, isConnected } = useAccount()
-  const [regime, setRegime] = useState<Regime>('ANALYZING')
+  const [regime, setRegime] = useState<Regime>('READY')
   const [loading, setLoading] = useState(false)
   const [log, setLog] = useState<string[]>([])
   const [usycAlloc, setUsycAlloc] = useState(0)
@@ -109,6 +109,7 @@ export default function PortfolioPage() {
     if (!isConnected) return
 
     setLoading(true)
+    setRegime('ANALYZING')
     setLog([])
 
     try {
@@ -133,6 +134,7 @@ export default function PortfolioPage() {
   }
 
   const regimeClass = regime === 'RISK-ON' ? 'regime-on' : regime === 'RISK-OFF' ? 'regime-off' : 'regime-analyzing'
+  const regimeLabel = regime === 'READY' ? 'READY TO RUN' : regime
   const allocation = clampAllocation(usycAlloc)
   const shortAddress = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : ''
 
@@ -165,7 +167,7 @@ export default function PortfolioPage() {
                 <div className="card-title">Market Regime</div>
                 <div className={`regime-badge ${regimeClass}`}>
                   <span className="regime-dot"></span>
-                  {regime}
+                  {regimeLabel}
                 </div>
 
                 <div className="allocation-section">
