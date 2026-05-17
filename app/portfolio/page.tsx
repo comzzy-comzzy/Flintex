@@ -6,6 +6,7 @@ import Navbar from '@/components/Navbar'
 import { type Address, formatUnits, zeroAddress } from 'viem'
 import { useAccount, useBalance, useReadContract } from 'wagmi'
 
+const ARC_TESTNET_CHAIN_ID = 5042002
 const NATIVE_USDC_DECIMALS = 18
 const ERC20_TOKEN_DECIMALS = 6
 
@@ -64,6 +65,7 @@ export default function PortfolioPage() {
 
   const usdcBalance = useBalance({
     address,
+    chainId: ARC_TESTNET_CHAIN_ID,
     query: { enabled: Boolean(address) },
   })
 
@@ -72,6 +74,7 @@ export default function PortfolioPage() {
     abi: ERC20_BALANCE_ABI,
     functionName: 'balanceOf',
     args: [address ?? zeroAddress],
+    chainId: ARC_TESTNET_CHAIN_ID,
     query: { enabled: Boolean(address) },
   })
 
@@ -80,6 +83,7 @@ export default function PortfolioPage() {
     abi: ERC20_BALANCE_ABI,
     functionName: 'balanceOf',
     args: [address ?? zeroAddress],
+    chainId: ARC_TESTNET_CHAIN_ID,
     query: { enabled: Boolean(address) },
   })
 

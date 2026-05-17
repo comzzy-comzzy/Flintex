@@ -8,12 +8,12 @@ import '@rainbow-me/rainbowkit/styles.css'
 const arcTestnet = {
   id: 5042002,
   name: 'Arc Testnet',
-  nativeCurrency: { name: 'USD Coin', symbol: 'USDC', decimals: 6 },
+  nativeCurrency: { name: 'USD Coin', symbol: 'USDC', decimals: 18 },
   rpcUrls: {
-    default: { http: ['https://rpc.testnet.arc-node.thecanteenapp.com/v1/swrm_2654ec0ed6f429cbd2f1c606bd73908182839e25914786e1b3e20f570f3b1435'] }
+    default: { http: ['https://rpc.testnet.arc.network'] },
   },
   blockExplorers: {
-    default: { name: 'Arc Explorer', url: 'https://explorer.arc.network' }
+    default: { name: 'Arcscan', url: 'https://testnet.arcscan.app' },
   },
   testnet: true,
 } as const satisfies Chain
