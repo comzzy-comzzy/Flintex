@@ -1,5 +1,6 @@
 'use client'
 import { RainbowKitProvider, getDefaultConfig } from '@rainbow-me/rainbowkit'
+import type { Chain } from 'viem'
 import { WagmiProvider } from 'wagmi'
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query'
 import '@rainbow-me/rainbowkit/styles.css'
@@ -15,12 +16,12 @@ const arcTestnet = {
     default: { name: 'Arc Explorer', url: 'https://explorer.arc.network' }
   },
   testnet: true,
-}
+} as const satisfies Chain
 
 const config = getDefaultConfig({
   appName: 'Flintex',
   projectId: 'flintex-agora',
-  chains: [arcTestnet as any],
+  chains: [arcTestnet],
   ssr: true,
 })
 

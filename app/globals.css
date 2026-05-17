@@ -87,9 +87,17 @@ body {
 .market-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 16px; padding: 14px 16px; background: #060a0f; border: 1px solid #0f1e2e; border-radius: 8px; }
 .market-kicker { font-family: 'Geist Mono', monospace; font-size: 10px; color: #475569; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
 .market-title { color: #f0f9ff; font-size: 13.5px; line-height: 1.45; }
+.market-criteria { color: #475569; font-family: 'Geist', sans-serif; font-size: 12px; line-height: 1.45; margin-top: 6px; }
 .market-score { min-width: 72px; text-align: right; }
 .market-score span { display: block; font-family: 'Instrument Serif', serif; font-size: 28px; line-height: 1; color: #67e8f9; }
 .market-score small { display: block; margin-top: 5px; font-family: 'Geist Mono', monospace; font-size: 10px; color: #475569; text-transform: uppercase; }
+.market-form { display: grid; gap: 14px; }
+.market-form label { display: grid; gap: 7px; }
+.market-form span { font-family: 'Geist Mono', monospace; font-size: 10px; color: #475569; letter-spacing: 0.1em; text-transform: uppercase; }
+.market-form input, .market-form textarea { width: 100%; background: #060a0f; border: 1px solid #0f1e2e; border-radius: 8px; color: #f0f9ff; font-family: 'Geist', sans-serif; font-size: 13.5px; padding: 11px 12px; outline: none; transition: border-color 0.2s; }
+.market-form textarea { resize: vertical; line-height: 1.5; }
+.market-form input:focus, .market-form textarea:focus { border-color: #67e8f9; }
+.market-form input::placeholder, .market-form textarea::placeholder { color: #475569; }
 @media (max-width: 768px) {
   .page { padding: 80px 20px 40px; }
   .grid-2, .dashboard-grid { grid-template-columns: 1fr; }
