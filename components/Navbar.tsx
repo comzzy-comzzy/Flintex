@@ -131,7 +131,7 @@ export default function Navbar() {
 
         <div className="nav-cta">
           <div className="desktop-connect">
-            <ConnectButton />
+            <ConnectButton showBalance={false} />
           </div>
           <button
             type="button"
@@ -204,7 +204,7 @@ export default function Navbar() {
             )}
 
             <div className="menu-wallet">
-              <ConnectButton />
+              <ConnectButton showBalance={false} />
             </div>
           </div>
         </div>
