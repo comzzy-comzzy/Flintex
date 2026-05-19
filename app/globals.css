@@ -163,9 +163,56 @@ body {
 .market-form textarea { resize: vertical; line-height: 1.5; }
 .market-form input:focus, .market-form textarea:focus { border-color: #67e8f9; }
 .market-form input::placeholder, .market-form textarea::placeholder { color: #475569; }
+.market-section { margin-bottom: 20px; }
+.market-section-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; margin-bottom: 20px; }
+.news-feed-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.news-signal-card { background: #090d14; border: 1px solid #0f1e2e; border-radius: 10px; padding: 16px; min-width: 0; }
+.news-signal-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.news-signal-top span { color: #67e8f9; font-family: 'Instrument Serif', serif; font-size: 26px; line-height: 1; }
+.news-signal-card h3 { color: #f0f9ff; font-size: 13.5px; line-height: 1.35; font-weight: 500; margin-bottom: 8px; }
+.news-signal-card p { color: #94a3b8; font-size: 12px; line-height: 1.5; min-height: 54px; }
+.market-summary-strip { display: grid; grid-template-columns: repeat(3, auto); gap: 8px; }
+.market-summary-strip div { min-width: 86px; background: #090d14; border: 1px solid #0f1e2e; border-radius: 8px; padding: 11px 12px; text-align: right; }
+.market-summary-strip span { display: block; color: #f0f9ff; font-family: 'Instrument Serif', serif; font-size: 24px; line-height: 1; white-space: nowrap; }
+.market-summary-strip small { display: block; color: #475569; font-family: 'Geist Mono', monospace; font-size: 9px; letter-spacing: 0.08em; margin-top: 5px; text-transform: uppercase; }
+.active-market-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.active-market-card { background: #090d14; border: 1px solid #0f1e2e; border-radius: 10px; padding: 18px; min-width: 0; display: flex; flex-direction: column; gap: 13px; }
+.active-market-card h3 { color: #f0f9ff; font-size: 16px; line-height: 1.35; font-weight: 500; }
+.active-market-card p { color: #94a3b8; font-size: 12.5px; line-height: 1.55; }
+.active-market-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.category-badge, .alpha-badge, .spawn-badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 6px 9px; font-family: 'Geist Mono', monospace; font-size: 9.5px; line-height: 1; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; }
+.category-badge { color: #67e8f9; background: #0d1520; border: 1px solid #1e3a4f; }
+.alpha-badge { color: #4ade80; background: #0d2818; border: 1px solid #166534; }
+.spawn-badge { color: #94a3b8; background: #060a0f; border: 1px solid #0f1e2e; }
+.market-trigger { display: flex; align-items: flex-start; gap: 8px; background: #060a0f; border: 1px solid #0f1e2e; border-radius: 8px; padding: 10px; }
+.market-trigger svg { color: #67e8f9; margin-top: 1px; flex: 0 0 auto; }
+.market-trigger span { color: #94a3b8; font-family: 'Geist Mono', monospace; font-size: 10.5px; line-height: 1.45; }
+.market-card-meta, .probability-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.probability-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.market-card-meta div, .probability-grid div { background: #060a0f; border: 1px solid #0f1e2e; border-radius: 8px; padding: 10px; min-width: 0; }
+.market-card-meta span, .probability-grid span { display: block; color: #475569; font-family: 'Geist Mono', monospace; font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
+.market-card-meta strong, .probability-grid strong { display: block; color: #f0f9ff; font-family: 'Geist Mono', monospace; font-size: 12px; line-height: 1.25; overflow-wrap: anywhere; }
+.probability-grid strong { color: #67e8f9; font-size: 16px; }
+.probability-grid .disagreement-hot { border-color: #166534; background: #0d2818; }
+.probability-grid .disagreement-hot strong { color: #4ade80; }
+.market-resolution { color: #475569; font-size: 11.5px; line-height: 1.45; border-top: 1px solid #0f1e2e; padding-top: 12px; }
+.bet-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: auto; }
+.bet-btn { border: 1px solid #1e3a4f; border-radius: 8px; padding: 10px 12px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; color: #f0f9ff; font-family: 'Geist', sans-serif; font-size: 13px; cursor: pointer; transition: transform 0.2s, border-color 0.2s; }
+.bet-btn:hover { transform: translateY(-1px); border-color: #67e8f9; }
+.bet-yes { background: #0d2818; }
+.bet-no { background: #2d1010; }
+.market-command-grid { grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); }
+.market-agent-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 16px 0; }
+.market-agent-stats div { display: flex; align-items: center; gap: 8px; background: #060a0f; border: 1px solid #0f1e2e; border-radius: 8px; padding: 11px 12px; color: #94a3b8; font-family: 'Geist Mono', monospace; font-size: 11px; }
+.market-agent-stats svg { color: #67e8f9; flex: 0 0 auto; }
+.market-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 768px) {
   .page { padding: 80px 20px 40px; }
-  .grid-2, .dashboard-grid, .portfolio-feature-grid { grid-template-columns: 1fr; }
+  .grid-2, .dashboard-grid, .portfolio-feature-grid, .active-market-grid, .news-feed-grid, .market-command-grid, .market-form-grid { grid-template-columns: 1fr; }
+  .market-section-header { flex-direction: column; }
+  .market-summary-strip { grid-template-columns: 1fr 1fr 1fr; width: 100%; }
+  .market-summary-strip div { min-width: 0; text-align: left; }
+  .market-summary-strip span { font-size: 20px; }
   .feature-heading { flex-direction: column; }
   .memory-scoreboard { min-width: 0; width: 100%; }
   .capital-flow-canvas { min-height: 360px; }
