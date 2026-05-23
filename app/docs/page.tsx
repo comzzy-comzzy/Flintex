@@ -18,7 +18,7 @@ const coreDocs = [
     number: '03',
     label: 'ARCHITECTURE',
     href: '#architecture',
-    summary: 'How the UI, agent layer, Circle rails, Arc settlement, and contracts fit together.',
+    summary: 'How the UI, agent routes, deployed contract, Circle rails, and Arc settlement fit together.',
   },
   {
     number: '04',
@@ -42,13 +42,13 @@ const coreDocs = [
     number: '07',
     label: 'SMART_CONTRACTS',
     href: '#smart-contracts',
-    summary: 'Contracts for allocation, markets, settlement, resolution, and accounting.',
+    summary: 'How the deployed PredictionMarket contract handles creation, bets, claims, and payout reads.',
   },
   {
     number: '08',
     label: 'REST_API',
     href: '#rest-api',
-    summary: 'Backend routes used by the current app and the API shape planned for agent execution.',
+    summary: 'Live FreeModel-backed agent routes and the JSON they return.',
   },
   {
     number: '09',
@@ -120,18 +120,18 @@ const roadmap = [
     window: 'Q2 2026',
     title: 'Arc testnet command center',
     items: [
-      'Complete wallet-gated dashboards for PortfolioAgent, MarketAgent, and BetAgent.',
-      'Add durable decision logs so each agent run can be reviewed after refresh.',
-      'Ship the documentation system as the canonical Flintex reference.',
+      'Keep wallet-gated dashboards for PortfolioAgent, MarketAgent, and BetAgent aligned with the deployed contract.',
+      'Expand durable decision logs so each agent run and transaction can be reviewed after refresh.',
+      'Keep the documentation system current as the canonical Flintex reference.',
     ],
   },
   {
     phase: 'Phase 2',
     window: 'Q3 2026',
-    title: 'Onchain allocation and market contracts',
+    title: 'Onchain allocation and contract hardening',
     items: [
       'Deploy capital pool accounting contracts with per-agent budget limits.',
-      'Launch binary market creation, liquidity seeding, and resolution contracts on Arc testnet.',
+      'Harden the deployed PredictionMarket flow with stronger testing, indexing, and admin safety controls.',
       'Introduce policy controls for max drawdown, per-market exposure, and emergency pause.',
     ],
   },
@@ -182,7 +182,7 @@ const faq = [
   },
   {
     question: 'Are the agents fully autonomous today?',
-    answer: 'The current app demonstrates wallet-gated agent analysis and market workflows. The roadmap moves toward policy-bound execution, contract-based controls, and auditable autonomy.',
+    answer: 'The current app demonstrates wallet-gated agent analysis and live contract workflows. Users still approve wallet actions before createMarket, betYes, betNo, or claimPayout execute.',
   },
 ]
 
@@ -191,6 +191,7 @@ const glossary = [
   ['PortfolioAgent', 'The agent that reads balances, detects market regime, and recommends rebalancing or USYC allocation.'],
   ['MarketAgent', 'The agent that turns macro and geopolitical events into specific prediction market drafts.'],
   ['BetAgent', 'The agent that finds mispriced markets, estimates true probability, and sizes positions using Kelly discipline.'],
+  ['My Bets', 'The compact tracker on the Bets page that shows connected-wallet positions and their Open, Closed, Won, Lost, or Claimed status.'],
   ['Risk Gate', 'A policy rule that limits exposure, drawdown, market type, or execution authority before an agent can spend capital.'],
   ['Resolution Criteria', 'The exact rule that determines whether a Flintex prediction market settles YES or NO.'],
   ['Decision Log', 'A human-readable record of why an agent recommended or executed an action.'],
@@ -272,16 +273,16 @@ export default function DocsPage() {
         <header className="docs-hero">
           <div>
             <div className="docs-kicker">Core_Documentation</div>
-            <h1 className="docs-title">Flintex docs for the <em>agent market OS.</em></h1>
+            <h1 className="docs-title">Flintex docs for the <em>live agent market OS.</em></h1>
             <p className="docs-subtitle">
-              This is the product reference for Flintex: three autonomous agents, one shared capital pool, USDC-native settlement on Arc, and Circle rails for wallet, yield, and cross-chain money movement.
+              This is the product reference for Flintex: three autonomous agents, one shared capital pool, a deployed PredictionMarket contract on Arc testnet, and Circle rails for wallet, yield, and cross-chain money movement.
             </p>
           </div>
 
           <aside className="docs-status" aria-label="Flintex documentation status">
             <div className="docs-status-row">
               <span className="docs-status-label">Version</span>
-              <span className="docs-status-value">Docs v0.1</span>
+              <span className="docs-status-value">Docs v0.2</span>
             </div>
             <div className="docs-status-row">
               <span className="docs-status-label">Network</span>
@@ -292,8 +293,8 @@ export default function DocsPage() {
               <span className="docs-status-value">Portfolio / Market / Bet</span>
             </div>
             <div className="docs-status-row">
-              <span className="docs-status-label">Settlement</span>
-              <span className="docs-status-value">USDC first</span>
+              <span className="docs-status-label">Contract</span>
+              <span className="docs-status-value">PredictionMarket live</span>
             </div>
           </aside>
         </header>
@@ -331,10 +332,10 @@ export default function DocsPage() {
                 <div>
                   <h2>Introduction</h2>
                   <p>
-                    Flintex is a USDC-native agent market OS. Instead of asking a user to manually rebalance a portfolio, research macro events, create prediction markets, and size bets, Flintex coordinates three specialized AI agents against one shared pool of capital.
+                    Flintex is a USDC-native agent market OS. Instead of asking a user to manually rebalance a portfolio, research macro events, create prediction markets, and size bets, Flintex coordinates three specialized AI agents against one shared pool of capital and a live onchain market contract.
                   </p>
                   <p>
-                    The current product is built around PortfolioAgent, MarketAgent, and BetAgent. PortfolioAgent manages the defensive baseline, MarketAgent turns the world into tradeable questions, and BetAgent searches for probability mispricing.
+                    The current product is built around PortfolioAgent, MarketAgent, and BetAgent. PortfolioAgent manages the defensive baseline, MarketAgent turns the world into tradeable questions, and BetAgent searches for probability mispricing with real contract reads and wallet-confirmed execution.
                   </p>
                 </div>
               </div>
@@ -364,7 +365,7 @@ export default function DocsPage() {
                 <div>
                   <h2>Architecture</h2>
                   <p>
-                    Flintex is structured as a control plane for autonomous financial agents. The UI presents agent dashboards and decision logs, the backend routes model requests, and the settlement layer turns approved decisions into USDC actions on Arc.
+                    Flintex is structured as a control plane for autonomous financial agents. The UI presents live dashboards and decision logs, the backend routes FreeModel requests, and the settlement layer turns approved decisions into USDC actions on the deployed PredictionMarket contract.
                   </p>
                   <div className="layer-grid">
                     {architectureLayers.map((layer) => (
@@ -424,8 +425,8 @@ export default function DocsPage() {
                   </p>
                   <ul className="doc-list">
                     <li><strong>PortfolioAgent:</strong> can inspect balances, classify risk regime, and recommend USYC or asset allocation changes.</li>
-                    <li><strong>MarketAgent:</strong> can convert news into market drafts with title, description, resolution criteria, deadline, and seed liquidity.</li>
-                    <li><strong>BetAgent:</strong> can compare model odds to market odds, apply Kelly sizing, and propose entries or exits.</li>
+                    <li><strong>MarketAgent:</strong> can convert news into market drafts and submit createMarket onchain after wallet approval.</li>
+                    <li><strong>BetAgent:</strong> can compare model odds to real contract odds, apply Kelly sizing, and submit betYes or betNo after wallet approval.</li>
                     <li><strong>Master allocator:</strong> compares all agent scores and applies user policy before capital moves.</li>
                   </ul>
                 </div>
@@ -438,14 +439,13 @@ export default function DocsPage() {
                 <div>
                   <h2>Smart contracts</h2>
                   <p>
-                    The current app is a testnet product surface. The contract roadmap turns Flintex into an auditable system where capital budgets, market creation, bets, settlement, resolution, and emergency controls live onchain.
+                    The deployed PredictionMarket contract now powers market creation, YES/NO bets, resolution, claims, and position reads on Arc testnet.
                   </p>
                   <ul className="doc-list">
-                    <li><strong>CapitalPool:</strong> tracks deposits, withdrawals, per-agent balances, and available USDC.</li>
-                    <li><strong>AgentPolicy:</strong> stores user limits for max exposure, authorized agents, and pause controls.</li>
-                    <li><strong>MarketFactory:</strong> creates binary markets from MarketAgent drafts after validation.</li>
-                    <li><strong>MarketPool:</strong> manages YES and NO liquidity, positions, fees, and settlement accounting.</li>
-                    <li><strong>Resolver:</strong> records final outcomes from approved sources and closes markets.</li>
+                    <li><strong>PredictionMarket:</strong> creates markets, tracks YES and NO positions, resolves outcomes, and pays winners.</li>
+                    <li><strong>Read surface:</strong> marketCount, markets(marketId), getPosition, quotePayout, and quoteBetPayout drive the Markets and Bets pages.</li>
+                    <li><strong>Wallet flow:</strong> users approve USDC first, then call createMarket, betYes, betNo, or claimPayout from the connected wallet.</li>
+                    <li><strong>Audit trail:</strong> every market, bet, and payout emits onchain events that can be surfaced in the UI or docs later.</li>
                   </ul>
                 </div>
               </div>
@@ -466,10 +466,14 @@ returns: { "regime": "RISK-ON", "usycAllocation": 15, "reasoning": ["..."] }
 
 POST /api/market-agent
 body: {}
-returns: { "markets": [{ "title": "...", "resolutionCriteria": "...", "deadline": "YYYY-MM-DD" }], "newsItems": [] }`}</code>
+returns: [{ "title": "...", "description": "...", "resolutionCriteria": "...", "deadline": "YYYY-MM-DD", "initialLiquidity": "5 USDC", "aiProbability": 58, "category": "Macro", "triggeredByNews": "..." }]
+
+POST /api/bet-agent
+body: { "openMarkets": [{ "marketId": "1", "title": "...", "crowdOdds": 42.1 }] }
+returns: { "opportunities": [{ "marketId": "1", "title": "...", "aiProbability": 58.2, "crowdOdds": 42.1, "disagreementScore": 16.1, "kellySize": 0.08, "expectedValue": 0.12, "isHighAlpha": true, "recommendation": "HIGH_ALPHA_BET_YES" }] }`}</code>
                   </div>
                   <p>
-                    Planned routes include <code>/api/allocator/run</code>, <code>/api/agents/:id/score</code>, <code>/api/markets/:id/resolve</code>, and <code>/api/positions</code>.
+                    The live agent services use FreeModel at <code>https://cc.freemodel.dev</code> with model <code>claude-haiku-4-5-20251001</code>.
                   </p>
                 </div>
               </div>
