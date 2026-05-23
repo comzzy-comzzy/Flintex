@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
 import { execFile as execFileCb } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { mkdtemp, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { promisify } from 'node:util'
 
 export const runtime = 'nodejs'
@@ -151,6 +153,67 @@ const parseMarkets = (text: string) => {
   return markets.slice(0, 3)
 }
 
+type ClaudeCommand = {
+  command: string
+  argsPrefix: string[]
+  source: string
+}
+
+const resolveClaudeCommand = (): ClaudeCommand => {
+  const configuredBinary = process.env.CLAUDE_CODE_BINARY
+  if (configuredBinary?.trim()) {
+    return {
+      command: configuredBinary.trim(),
+      argsPrefix: [],
+      source: 'CLAUDE_CODE_BINARY',
+    }
+  }
+
+  const wrapperCandidates = [
+    path.join(process.cwd(), 'node_modules', '@anthropic-ai', 'claude-code', 'cli-wrapper.cjs'),
+    path.join(
+      process.cwd(),
+      'node_modules',
+      '.pnpm',
+      '@anthropic-ai+claude-code@2.1.150',
+      'node_modules',
+      '@anthropic-ai',
+      'claude-code',
+      'cli-wrapper.cjs',
+    ),
+  ]
+
+  const wrapperPath = wrapperCandidates.find((candidate) => existsSync(candidate))
+  if (wrapperPath) {
+    return {
+      command: process.execPath,
+      argsPrefix: [wrapperPath],
+      source: '@anthropic-ai/claude-code wrapper',
+    }
+  }
+
+  const localBinary = path.join(
+    process.cwd(),
+    'node_modules',
+    '.bin',
+    process.platform === 'win32' ? 'claude.cmd' : 'claude',
+  )
+
+  if (existsSync(localBinary)) {
+    return {
+      command: localBinary,
+      argsPrefix: [],
+      source: 'node_modules/.bin/claude',
+    }
+  }
+
+  return {
+    command: 'claude',
+    argsPrefix: [],
+    source: 'global claude',
+  }
+}
+
 const runClaudeCodeFallback = async (prompt: string, apiKey: string) => {
   const tempDir = await mkdtemp(`${tmpdir()}/flintex-claude-`)
   const settingsPath = `${tempDir}/settings.json`
@@ -163,7 +226,14 @@ const runClaudeCodeFallback = async (prompt: string, apiKey: string) => {
       },
     }))
 
-    const { stdout, stderr } = await execFile('claude', [
+    const claudeCommand = resolveClaudeCommand()
+    console.log('[MarketAgent] Using Claude CLI fallback', stringifyForLog({
+      source: claudeCommand.source,
+      command: claudeCommand.command === process.execPath ? 'node' : claudeCommand.command,
+    }))
+
+    const { stdout, stderr } = await execFile(claudeCommand.command, [
+      ...claudeCommand.argsPrefix,
       '--bare',
       '--print',
       '--model',

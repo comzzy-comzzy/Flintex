@@ -1,6 +1,7 @@
 allowBuilds:
-  esbuild: set this to true or false
-  keccak: set this to true or false
+  '@anthropic-ai/claude-code': true
+  esbuild: true
+  keccak: true
   msw: true
   sharp: true
   unrs-resolver: true

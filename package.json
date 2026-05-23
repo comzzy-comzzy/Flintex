@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@anthropic-ai/claude-code": "2.1.150",
     "@anthropic-ai/sdk": "^0.95.2",
     "@circle-fin/circle-sdk": "^2.9.0",
     "@rainbow-me/rainbowkit": "^2.2.11",
