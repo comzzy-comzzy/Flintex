@@ -256,6 +256,19 @@ body {
 .kelly-simulator input { width: 100%; accent-color: #67e8f9; }
 .kelly-simulator span { display: block; color: #475569; font-family: 'Geist Mono', monospace; font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; }
 .kelly-simulator strong { color: #f0f9ff; font-family: 'Geist Mono', monospace; font-size: 11px; white-space: nowrap; }
+.my-bets-card { margin-bottom: 20px; }
+.my-bet-row { align-items: start; }
+.my-bet-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.my-bet-meta span { color: #94a3b8; background: #090d14; border: 1px solid #0f1e2e; border-radius: 999px; padding: 5px 7px; font-family: 'Geist Mono', monospace; font-size: 9.5px; line-height: 1; white-space: nowrap; }
+.my-bet-score { min-width: 118px; }
+.my-bet-score span { font-size: 18px; font-family: 'Geist Mono', monospace; overflow-wrap: anywhere; }
+.my-bet-action { display: inline-flex; justify-content: center; margin-top: 8px; color: #060a0f; background: #67e8f9; border-radius: 999px; padding: 6px 9px; font-family: 'Geist Mono', monospace; font-size: 10px; line-height: 1; text-decoration: none; }
+.status-badge { display: inline-flex; margin-left: 8px; border-radius: 999px; padding: 4px 7px; border: 1px solid currentColor; font-family: 'Geist Mono', monospace; font-size: 9px; line-height: 1; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; }
+.status-open { color: #67e8f9; background: #0d1520; }
+.status-closed { color: #facc15; background: #2d2408; }
+.status-won { color: #4ade80; background: #0d2818; }
+.status-lost { color: #f87171; background: #2d1010; }
+.status-claimed { color: #94a3b8; background: #060a0f; }
 @media (max-width: 768px) {
   .page { padding: 80px 20px 40px; }
   .grid-2, .dashboard-grid, .portfolio-feature-grid, .active-market-grid, .news-feed-grid, .market-command-grid, .market-form-grid { grid-template-columns: 1fr; }
@@ -284,4 +297,6 @@ body {
   .compact-timeline-item { grid-template-columns: 1fr; gap: 4px; }
   .kelly-simulator { grid-template-columns: 1fr 1fr; }
   .kelly-simulator label { grid-column: 1 / -1; }
+  .my-bet-score { min-width: 0; }
+  .my-bet-meta span { white-space: normal; }
 }

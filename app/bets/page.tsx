@@ -5,7 +5,7 @@ import { SlidersHorizontal } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import Navbar from '@/components/Navbar'
 import { formatUnits } from 'viem'
-import { useReadContract, useReadContracts } from 'wagmi'
+import { useAccount, useReadContract, useReadContracts } from 'wagmi'
 import {
   ARC_TESTNET_CHAIN_ID,
   PREDICTION_MARKET_ABI,
@@ -46,6 +46,23 @@ type BetOpportunity = {
   isHighAlpha: boolean
   recommendation: string
   deadline: bigint
+}
+
+type UserPosition = {
+  yesAmount: bigint
+  noAmount: bigint
+  claimed: boolean
+  payout: bigint
+}
+
+type MyBetStatus = 'Open' | 'Closed' | 'Won' | 'Lost' | 'Claimed'
+
+type MyBet = {
+  market: ContractMarket
+  position: UserPosition
+  status: MyBetStatus
+  sideLabel: string
+  outcomeLabel: string
 }
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
@@ -95,6 +112,16 @@ const formatCountdown = (deadline: bigint, nowMs: number) => {
   return `${minutes}m ${seconds.toString().padStart(2, '0')}s`
 }
 
+const formatDeadline = (deadline: bigint) => {
+  if (deadline === 0n) return 'No deadline'
+
+  return new Date(Number(deadline) * 1000).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
 const toBigIntValue = (value: unknown) => (typeof value === 'bigint' ? value : 0n)
 
 const toNumberValue = (value: unknown) => {
@@ -126,6 +153,18 @@ const normalizeContractMarket = (marketId: bigint, value: unknown): ContractMark
     pool: toBigIntValue(value[11]),
     outcome: toNumberValue(value[12]),
     resolved: Boolean(value[13]),
+  }
+}
+
+const normalizeUserPosition = (value: unknown): Omit<UserPosition, 'payout'> => {
+  if (!Array.isArray(value) || value.length < 3) {
+    return { yesAmount: 0n, noAmount: 0n, claimed: false }
+  }
+
+  return {
+    yesAmount: toBigIntValue(value[0]),
+    noAmount: toBigIntValue(value[1]),
+    claimed: Boolean(value[2]),
   }
 }
 
@@ -164,6 +203,36 @@ const calculateKelly = (aiProbability: number, crowdOdds: number) => {
   }
 }
 
+const getPositionSideLabel = (position: UserPosition) => {
+  if (position.yesAmount > 0n && position.noAmount > 0n) return 'YES + NO'
+  if (position.yesAmount > 0n) return 'YES'
+  if (position.noAmount > 0n) return 'NO'
+  return 'None'
+}
+
+const getOutcomeLabel = (market: ContractMarket) => {
+  if (!market.resolved) return 'Pending'
+  if (market.outcome === 1) return 'YES'
+  if (market.outcome === 2) return 'NO'
+  return 'Unknown'
+}
+
+const getMyBetStatus = (market: ContractMarket, position: UserPosition, nowMs: number): MyBetStatus => {
+  if (position.claimed) return 'Claimed'
+
+  if (market.resolved) {
+    const winningAmount = market.outcome === 1
+      ? position.yesAmount
+      : market.outcome === 2
+        ? position.noAmount
+        : 0n
+
+    return winningAmount > 0n ? 'Won' : 'Lost'
+  }
+
+  return Number(market.deadline) * 1000 <= nowMs ? 'Closed' : 'Open'
+}
+
 const buildOpportunity = (market: ContractMarket, crowdOdds: number): BetOpportunity => {
   const disagreementScore = round(Math.abs(market.aiProbability - crowdOdds), 1)
   const kelly = calculateKelly(market.aiProbability, crowdOdds)
@@ -190,6 +259,7 @@ const buildOpportunity = (market: ContractMarket, crowdOdds: number): BetOpportu
 }
 
 export default function BetsPage() {
+  const { address, isConnected } = useAccount()
   const [expandedMarket, setExpandedMarket] = useState<string | null>(null)
   const [kellyFractions, setKellyFractions] = useState<Record<string, number>>({})
   const [now, setNow] = useState(() => Date.now())
@@ -232,13 +302,83 @@ export default function BetsPage() {
     query: { enabled: marketReadContracts.length > 0 },
   })
 
-  const markets = useMemo(() => (marketResults ?? [])
+  const allMarkets = useMemo(() => (marketResults ?? [])
     .map((result, index) => (result.status === 'success'
       ? normalizeContractMarket(marketIds[index], result.result)
       : null))
-    .filter((market): market is ContractMarket => market !== null)
-    .filter((market) => !market.resolved),
+    .filter((market): market is ContractMarket => market !== null),
   [marketIds, marketResults])
+
+  const markets = useMemo(() => allMarkets
+    .filter((market) => !market.resolved),
+  [allMarkets])
+
+  const positionReadContracts = useMemo(() => address ? allMarkets.map((market) => ({
+    address: PREDICTION_MARKET_ADDRESS,
+    abi: PREDICTION_MARKET_ABI,
+    functionName: 'getPosition',
+    args: [market.id, address],
+    chainId: ARC_TESTNET_CHAIN_ID,
+  } as const)) : [], [address, allMarkets])
+
+  const {
+    data: positionResults,
+    isLoading: positionsLoading,
+  } = useReadContracts({
+    contracts: positionReadContracts,
+    query: { enabled: positionReadContracts.length > 0 },
+  })
+
+  const payoutQuoteReadContracts = useMemo(() => address ? allMarkets.map((market) => ({
+    address: PREDICTION_MARKET_ADDRESS,
+    abi: PREDICTION_MARKET_ABI,
+    functionName: 'quotePayout',
+    args: [market.id, address],
+    chainId: ARC_TESTNET_CHAIN_ID,
+  } as const)) : [], [address, allMarkets])
+
+  const {
+    data: payoutQuoteResults,
+    isLoading: payoutQuotesLoading,
+  } = useReadContracts({
+    contracts: payoutQuoteReadContracts,
+    query: { enabled: payoutQuoteReadContracts.length > 0 },
+  })
+
+  const userPositions = useMemo(() => {
+    const nextPositions = new Map<string, UserPosition>()
+
+    allMarkets.forEach((market, index) => {
+      const positionResult = positionResults?.[index]
+      const payoutResult = payoutQuoteResults?.[index]
+      const position = positionResult?.status === 'success'
+        ? normalizeUserPosition(positionResult.result)
+        : { yesAmount: 0n, noAmount: 0n, claimed: false }
+      const payout = payoutResult?.status === 'success' && typeof payoutResult.result === 'bigint'
+        ? payoutResult.result
+        : 0n
+
+      nextPositions.set(market.marketId, { ...position, payout })
+    })
+
+    return nextPositions
+  }, [allMarkets, payoutQuoteResults, positionResults])
+
+  const myBets = useMemo(() => allMarkets
+    .map((market): MyBet | null => {
+      const position = userPositions.get(market.marketId)
+      if (!position || (position.yesAmount === 0n && position.noAmount === 0n)) return null
+
+      return {
+        market,
+        position,
+        status: getMyBetStatus(market, position, now),
+        sideLabel: getPositionSideLabel(position),
+        outcomeLabel: getOutcomeLabel(market),
+      }
+    })
+    .filter((bet): bet is MyBet => bet !== null),
+  [allMarkets, now, userPositions])
 
   const marketsById = useMemo(
     () => new Map(markets.map((market) => [market.marketId, market])),
@@ -256,7 +396,10 @@ export default function BetsPage() {
   const pendingMarkets = useMemo(() => markets.filter((market) => getCrowdOdds(market) === null), [markets])
   const bestEdge = opportunities.reduce((best, opportunity) => Math.max(best, opportunity.disagreementScore), 0)
   const actionableCount = opportunities.filter((opportunity) => opportunity.side !== 'PASS').length
+  const wonCount = myBets.filter((bet) => bet.status === 'Won').length
+  const openBetCount = myBets.filter((bet) => bet.status === 'Open' || bet.status === 'Closed').length
   const isLoadingMarkets = marketCountLoading || marketsLoading
+  const isLoadingPositions = isLoadingMarkets || positionsLoading || payoutQuotesLoading
 
   return (
     <>
@@ -316,9 +459,69 @@ export default function BetsPage() {
                   <td className="portfolio-amount-cell">{actionableCount}</td>
                   <td className="portfolio-value-cell">{actionableCount > 0 ? 'Actionable' : 'Waiting'}</td>
                 </tr>
+                <tr>
+                  <td className="portfolio-asset-cell">My bets</td>
+                  <td className="portfolio-amount-cell">{myBets.length}</td>
+                  <td className="portfolio-value-cell">{wonCount > 0 ? `${wonCount} won` : openBetCount > 0 ? 'In play' : 'None'}</td>
+                </tr>
               </tbody>
             </table>
           </div>
+        </div>
+
+        <div className="card my-bets-card page-anim page-anim-5">
+          <div className="card-title">My Bets</div>
+          {!isConnected ? (
+            <div className="empty-market-state">
+              <p>Connect your wallet to see your placed bets, outcomes, and claimable payout status.</p>
+            </div>
+          ) : isLoadingPositions ? (
+            <div className="empty-market-state">
+              <p>Loading your on-chain bet positions...</p>
+            </div>
+          ) : myBets.length === 0 ? (
+            <div className="empty-market-state">
+              <p>No placed bets for this wallet yet. <Link href="/markets">Go to Markets to place a YES or NO bet.</Link></p>
+            </div>
+          ) : (
+            <div className="market-list">
+              {myBets.map((bet) => {
+                const totalStaked = bet.position.yesAmount + bet.position.noAmount
+                const payoutLabel = bet.status === 'Won'
+                  ? formatUsdcAmount(bet.position.payout)
+                  : bet.status === 'Claimed'
+                    ? 'Claimed'
+                    : bet.status === 'Lost'
+                      ? '0.00 USDC'
+                      : 'Pending'
+
+                return (
+                  <div className="market-row my-bet-row" key={`my-bet-${bet.market.marketId}`}>
+                    <div>
+                      <div className="market-kicker">
+                        Market #{bet.market.marketId} · {bet.market.category || 'Prediction'}
+                        <span className={`status-badge status-${bet.status.toLowerCase()}`}>{bet.status}</span>
+                      </div>
+                      <div className="market-title">{bet.market.title}</div>
+                      <div className="my-bet-meta">
+                        <span>Side {bet.sideLabel}</span>
+                        <span>Stake {formatUsdcAmount(totalStaked)}</span>
+                        <span>YES {formatUsdcAmount(bet.position.yesAmount)}</span>
+                        <span>NO {formatUsdcAmount(bet.position.noAmount)}</span>
+                        <span>Deadline {formatDeadline(bet.market.deadline)}</span>
+                        <span>Outcome {bet.outcomeLabel}</span>
+                      </div>
+                    </div>
+                    <div className="market-score my-bet-score">
+                      <span>{payoutLabel}</span>
+                      <small>{bet.status === 'Won' ? 'claimable' : bet.status === 'Closed' ? 'awaiting resolution' : 'payout'}</small>
+                      {bet.status === 'Won' ? <Link href="/markets" className="my-bet-action">Claim</Link> : null}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         <div className="dashboard-grid page-anim page-anim-5">
@@ -428,6 +631,7 @@ export default function BetsPage() {
             <div className="card-title">Agent Log</div>
             <div className="log-box dashboard-log">
               <div className="log-line">BetAgent reads open markets from the deployed PredictionMarket contract.</div>
+              <div className="log-line">My Bets reads this wallet's getPosition and quotePayout data across all contract markets.</div>
               <div className="log-line">AI probability, YES/NO totals, pool amounts, and deadlines come from contract reads.</div>
               <div className="log-line">Kelly sizing uses f = (bp - q) / b against current crowd implied odds.</div>
             </div>
