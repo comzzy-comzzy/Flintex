@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
-import { ChevronRight, Menu, Search, X } from 'lucide-react'
+import { ChevronRight, Menu, Moon, Search, Sun, X } from 'lucide-react'
 
 const desktopLinks = [
   { label: 'Overview', href: '/#overview' },
@@ -26,7 +26,22 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark')
   const pathname = usePathname()
+
+  useEffect(() => {
+    const storedTheme = window.localStorage.getItem('flintex_theme')
+    const nextTheme = storedTheme === 'light' ? 'light' : 'dark'
+
+    setTheme(nextTheme)
+    document.documentElement.dataset.theme = nextTheme
+  }, [])
+
+  const setAppTheme = (nextTheme: 'dark' | 'light') => {
+    setTheme(nextTheme)
+    document.documentElement.dataset.theme = nextTheme
+    window.localStorage.setItem('flintex_theme', nextTheme)
+  }
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 10)
@@ -70,6 +85,14 @@ export default function Navbar() {
         .nav-links a { color: #94a3b8; text-decoration: none; font-size: 13.5px; font-family: 'Geist', sans-serif; transition: color 0.2s; }
         .nav-links a:hover { color: #f0f9ff; }
         .nav-cta { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+        .theme-switch { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid #1e3a4f; border-radius: 999px; background: #090d14; }
+        .theme-switch button { width: 32px; height: 30px; border: 0; border-radius: 999px; background: transparent; color: #475569; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.2s, color 0.2s; }
+        .theme-switch button:hover { color: #67e8f9; }
+        .theme-switch button.active { background: #0d1520; color: #67e8f9; }
+        .menu-theme-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 18px; padding-top: 18px; border-top: 1px solid #0f1e2e; }
+        .menu-theme-label { display: grid; gap: 3px; }
+        .menu-theme-label span { color: #f0f9ff; font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
+        .menu-theme-label small { color: #475569; font-size: 11px; }
         .menu-toggle { display: none; width: 38px; height: 38px; border: 1px solid #1e3a4f; border-radius: 8px; background: #090d14; color: #f0f9ff; align-items: center; justify-content: center; cursor: pointer; transition: border-color 0.2s, color 0.2s, background 0.2s; }
         .menu-toggle:hover { border-color: #67e8f9; color: #67e8f9; background: #0d1520; }
         .mobile-menu-shell { position: fixed; inset: 0; z-index: 99; pointer-events: none; }
@@ -100,6 +123,17 @@ export default function Navbar() {
         .menu-arrow { color: #475569; justify-self: end; }
         .menu-empty { padding: 18px 0; color: #94a3b8; font-family: 'Geist Mono', monospace; font-size: 11px; border-top: 1px solid #0f1e2e; border-bottom: 1px solid #0f1e2e; }
         .menu-wallet { margin-top: 18px; padding-top: 18px; border-top: 1px solid #0f1e2e; }
+        html[data-theme="light"] .navbar { background: rgba(248,250,252,0.9); border-bottom-color: #dbe7ef; }
+        html[data-theme="light"] .navbar.scrolled { border-bottom-color: #a9c6d5; }
+        html[data-theme="light"] .nav-wordmark, html[data-theme="light"] .nav-links a:hover, html[data-theme="light"] .menu-label, html[data-theme="light"] .menu-theme-label span { color: #0f172a; }
+        html[data-theme="light"] .nav-links a, html[data-theme="light"] .menu-meta, html[data-theme="light"] .menu-status { color: #475569; }
+        html[data-theme="light"] .theme-switch, html[data-theme="light"] .menu-toggle, html[data-theme="light"] .mobile-menu-panel, html[data-theme="light"] .menu-search input { background: #ffffff; border-color: #cfe0ea; color: #0f172a; }
+        html[data-theme="light"] .theme-switch button { color: #64748b; }
+        html[data-theme="light"] .theme-switch button.active { background: #e6f8fb; color: #0891b2; }
+        html[data-theme="light"] .mobile-menu-backdrop { background: rgba(15,23,42,0.24); }
+        html[data-theme="light"] .menu-protocol, html[data-theme="light"] .menu-list, html[data-theme="light"] .menu-row, html[data-theme="light"] .menu-wallet, html[data-theme="light"] .menu-theme-row { border-color: #dbe7ef; }
+        html[data-theme="light"] .menu-title, html[data-theme="light"] .menu-row a.active .menu-index, html[data-theme="light"] .menu-row a.active .menu-label { color: #0891b2; }
+        html[data-theme="light"] .menu-row a:hover, html[data-theme="light"] .menu-row a.active { background: linear-gradient(90deg, rgba(8,145,178,0.11), transparent 64%); }
         @media (max-width: 900px) {
           .navbar { padding: 0 20px; }
           .nav-links { display: none; }
@@ -130,6 +164,26 @@ export default function Navbar() {
         </ul>
 
         <div className="nav-cta">
+          <div className="theme-switch" role="group" aria-label="Color theme">
+            <button
+              type="button"
+              className={theme === 'dark' ? 'active' : ''}
+              aria-label="Use dark mode"
+              aria-pressed={theme === 'dark'}
+              onClick={() => setAppTheme('dark')}
+            >
+              <Moon size={15} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className={theme === 'light' ? 'active' : ''}
+              aria-label="Use white mode"
+              aria-pressed={theme === 'light'}
+              onClick={() => setAppTheme('light')}
+            >
+              <Sun size={15} aria-hidden="true" />
+            </button>
+          </div>
           <div className="desktop-connect">
             <ConnectButton showBalance={false} />
           </div>
@@ -202,6 +256,33 @@ export default function Navbar() {
             ) : (
               <div className="menu-empty">NO_FLINTEX_MATCH</div>
             )}
+
+            <div className="menu-theme-row">
+              <div className="menu-theme-label">
+                <span>Theme</span>
+                <small>{theme === 'light' ? 'White mode enabled' : 'Dark mode enabled'}</small>
+              </div>
+              <div className="theme-switch" role="group" aria-label="Mobile color theme">
+                <button
+                  type="button"
+                  className={theme === 'dark' ? 'active' : ''}
+                  aria-label="Use dark mode"
+                  aria-pressed={theme === 'dark'}
+                  onClick={() => setAppTheme('dark')}
+                >
+                  <Moon size={15} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className={theme === 'light' ? 'active' : ''}
+                  aria-label="Use white mode"
+                  aria-pressed={theme === 'light'}
+                  onClick={() => setAppTheme('light')}
+                >
+                  <Sun size={15} aria-hidden="true" />
+                </button>
+              </div>
+            </div>
 
             <div className="menu-wallet">
               <ConnectButton showBalance={false} />

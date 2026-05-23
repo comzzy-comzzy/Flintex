@@ -14,6 +14,20 @@
   --border-lit: #1e3a4f;
 }
 
+html[data-theme="light"] {
+  --bg: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-raised: #edf5f9;
+  --ice: #0891b2;
+  --ice-dim: #0f766e;
+  --ice-glow: #0891b210;
+  --text: #0f172a;
+  --muted: #475569;
+  --subtle: #64748b;
+  --border: #d9e6ee;
+  --border-lit: #b8d2df;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -52,6 +66,10 @@ body {
   animation-timing-function: ease-in-out;
   animation-iteration-count: infinite;
   will-change: transform;
+}
+
+html[data-theme="light"] .ghost-icon-shell {
+  opacity: 0.02;
 }
 
 .ghost-icon {
@@ -315,6 +333,235 @@ body {
 .status-won { color: #4ade80; background: #0d2818; }
 .status-lost { color: #f87171; background: #2d1010; }
 .status-claimed { color: #94a3b8; background: #060a0f; }
+
+html[data-theme="light"] body {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+html[data-theme="light"] body::before {
+  opacity: 0.07;
+}
+
+html[data-theme="light"] .card,
+html[data-theme="light"] .market-row,
+html[data-theme="light"] .empty-market-state,
+html[data-theme="light"] .news-signal-card,
+html[data-theme="light"] .active-market-card,
+html[data-theme="light"] .market-summary-strip div,
+html[data-theme="light"] .stack-card,
+html[data-theme="light"] .principle-card,
+html[data-theme="light"] .agent-feature-card,
+html[data-theme="light"] .code-block,
+html[data-theme="light"] .modal-shell,
+html[data-theme="light"] .menu-search input,
+html[data-theme="light"] .toggle-btn,
+html[data-theme="light"] .compact-timeline,
+html[data-theme="light"] .compact-timeline-item,
+html[data-theme="light"] .timeline-body,
+html[data-theme="light"] .timeline-dot,
+html[data-theme="light"] .capital-flow-canvas,
+html[data-theme="light"] .agent-row,
+html[data-theme="light"] .flow-core,
+html[data-theme="light"] .agent-node,
+html[data-theme="light"] .active-transfer,
+html[data-theme="light"] .agent-capital-row,
+html[data-theme="light"] .allocator-decision,
+html[data-theme="light"] .modal-meta div,
+html[data-theme="light"] .modal-payout,
+html[data-theme="light"] .modal-hash,
+html[data-theme="light"] .kelly-simulator,
+html[data-theme="light"] .my-bet-meta span {
+  background: #ffffff;
+  border-color: #d9e6ee;
+}
+
+html[data-theme="light"] .navbar,
+html[data-theme="light"] .docs-status,
+html[data-theme="light"] .docs-grid,
+html[data-theme="light"] .doc-tile,
+html[data-theme="light"] .layer-card,
+html[data-theme="light"] .roadmap-card,
+html[data-theme="light"] .faq-card,
+html[data-theme="light"] .glossary-row,
+html[data-theme="light"] .docs-cta,
+html[data-theme="light"] .doc-section,
+html[data-theme="light"] .docs-sidebar,
+html[data-theme="light"] .api-box {
+  border-color: #d9e6ee;
+}
+
+html[data-theme="light"] .page-sub,
+html[data-theme="light"] .stat-label,
+html[data-theme="light"] .log-line,
+html[data-theme="light"] .connect-prompt p,
+html[data-theme="light"] .market-criteria,
+html[data-theme="light"] .market-kicker,
+html[data-theme="light"] .market-summary-strip small,
+html[data-theme="light"] .market-card-meta span,
+html[data-theme="light"] .probability-grid span,
+html[data-theme="light"] .market-resolution,
+html[data-theme="light"] .market-chain-row,
+html[data-theme="light"] .modal-footnote,
+html[data-theme="light"] .docs-subtitle,
+html[data-theme="light"] .docs-status-label,
+html[data-theme="light"] .docs-status-value,
+html[data-theme="light"] .docs-sidebar a,
+html[data-theme="light"] .docs-section p,
+html[data-theme="light"] .doc-summary,
+html[data-theme="light"] .layer-card span,
+html[data-theme="light"] .roadmap-card span,
+html[data-theme="light"] .faq-card span,
+html[data-theme="light"] .glossary-row span,
+html[data-theme="light"] .menu-meta,
+html[data-theme="light"] .menu-empty,
+html[data-theme="light"] .menu-status,
+html[data-theme="light"] .menu-search input::placeholder,
+html[data-theme="light"] .menu-theme-label small,
+html[data-theme="light"] .timeline-reason,
+html[data-theme="light"] .timeline-evidence,
+html[data-theme="light"] .compact-timeline-copy p,
+html[data-theme="light"] .agent-status,
+html[data-theme="light"] .agent-alloc,
+html[data-theme="light"] .active-transfer small,
+html[data-theme="light"] .agent-capital-main small,
+html[data-theme="light"] .agent-capital-metrics small,
+html[data-theme="light"] .allocator-decision span,
+html[data-theme="light"] .allocator-decision strong {
+  color: #475569;
+}
+
+html[data-theme="light"] .page-title,
+html[data-theme="light"] .section-title,
+html[data-theme="light"] .section-sub,
+html[data-theme="light"] .hero-sub,
+html[data-theme="light"] .hero h1,
+html[data-theme="light"] .agent-name,
+html[data-theme="light"] .card-label,
+html[data-theme="light"] .card-balance,
+html[data-theme="light"] .card-change,
+html[data-theme="light"] .agent-status,
+html[data-theme="light"] .agent-alloc,
+html[data-theme="light"] .market-title,
+html[data-theme="light"] .active-market-card h3,
+html[data-theme="light"] .docs-title,
+html[data-theme="light"] .doc-section h2,
+html[data-theme="light"] .doc-section h3,
+html[data-theme="light"] .docs-cta strong,
+html[data-theme="light"] .feature-title,
+html[data-theme="light"] .pc-title,
+html[data-theme="light"] .sc-title,
+html[data-theme="light"] .flow-core strong,
+html[data-theme="light"] .agent-node,
+html[data-theme="light"] .menu-label,
+html[data-theme="light"] .menu-theme-label span {
+  color: #0f172a;
+}
+
+html[data-theme="light"] .nav-logo svg path[stroke="#67e8f9"],
+html[data-theme="light"] .ghost-icon-shell,
+html[data-theme="light"] .hero-badge,
+html[data-theme="light"] .hero-badge::before,
+html[data-theme="light"] .section-eyebrow,
+html[data-theme="light"] .afc-tag,
+html[data-theme="light"] .afc-desc,
+html[data-theme="light"] .afc-features li,
+html[data-theme="light"] .sc-label,
+html[data-theme="light"] .sc-desc,
+html[data-theme="light"] .stat-value,
+html[data-theme="light"] .card-change,
+html[data-theme="light"] .stat-sub,
+html[data-theme="light"] .step-num,
+html[data-theme="light"] .step-title,
+html[data-theme="light"] .step-desc,
+html[data-theme="light"] .market-score span,
+html[data-theme="light"] .probability-grid strong,
+html[data-theme="light"] .docs-kicker,
+html[data-theme="light"] .doc-number,
+html[data-theme="light"] .doc-section-number,
+html[data-theme="light"] .docs-sidebar a:hover,
+html[data-theme="light"] .docs-title em,
+html[data-theme="light"] .market-trigger svg,
+html[data-theme="light"] .menu-title,
+html[data-theme="light"] .menu-row a.active .menu-index,
+html[data-theme="light"] .menu-row a.active .menu-label,
+html[data-theme="light"] .timeline-switch svg,
+html[data-theme="light"] .compact-timeline-switch svg {
+  color: #0891b2;
+}
+
+html[data-theme="light"] .run-btn,
+html[data-theme="light"] .btn-primary,
+html[data-theme="light"] .btn-primary-lg,
+html[data-theme="light"] .my-bet-action,
+html[data-theme="light"] .menu-toggle.active,
+html[data-theme="light"] .theme-switch button.active,
+html[data-theme="light"] .status-open,
+html[data-theme="light"] .hindsight-pending,
+html[data-theme="light"] .hindsight-correct,
+html[data-theme="light"] .hindsight-missed,
+html[data-theme="light"] .hindsight-pending,
+html[data-theme="light"] .regime-on,
+html[data-theme="light"] .regime-off,
+html[data-theme="light"] .regime-analyzing {
+  background: #e6f8fb;
+}
+
+html[data-theme="light"] .run-btn,
+html[data-theme="light"] .btn-primary,
+html[data-theme="light"] .btn-primary-lg,
+html[data-theme="light"] .my-bet-action {
+  color: #0f172a;
+}
+
+html[data-theme="light"] .hero-tabs,
+html[data-theme="light"] .stats-bar,
+html[data-theme="light"] .steps-grid,
+html[data-theme="light"] .principles-grid,
+html[data-theme="light"] .stack-grid,
+html[data-theme="light"] .docs-grid {
+  background: #d9e6ee;
+}
+
+html[data-theme="light"] .hero-tabs,
+html[data-theme="light"] .code-header,
+html[data-theme="light"] .footer-cta,
+html[data-theme="light"] .footer-bottom,
+html[data-theme="light"] .footer-bottom-logo,
+html[data-theme="light"] .hero-visual,
+html[data-theme="light"] .hero,
+html[data-theme="light"] .stats-bar,
+html[data-theme="light"] .steps-grid,
+html[data-theme="light"] .agents-grid,
+html[data-theme="light"] .code-section,
+html[data-theme="light"] .principles-grid,
+html[data-theme="light"] .stack-grid {
+  border-color: #d9e6ee;
+}
+
+html[data-theme="light"] .hero-tab,
+html[data-theme="light"] .btn-outline,
+html[data-theme="light"] .btn-ghost,
+html[data-theme="light"] .nav-links a,
+html[data-theme="light"] .footer-links a {
+  color: #334155;
+}
+
+html[data-theme="light"] .hero-tab:hover,
+html[data-theme="light"] .btn-outline:hover,
+html[data-theme="light"] .btn-ghost:hover,
+html[data-theme="light"] .nav-links a:hover,
+html[data-theme="light"] .footer-links a:hover {
+  color: #0891b2;
+}
+
+html[data-theme="light"] .hero-badge::before,
+html[data-theme="light"] .agent-dot,
+html[data-theme="light"] .flow-pulse,
+html[data-theme="light"] .toggle-chevron,
+html[data-theme="light"] .market-trigger svg {
+  box-shadow: none;
+}
 @media (max-width: 768px) {
   .page { padding: 80px 20px 40px; }
   .grid-2, .dashboard-grid, .portfolio-feature-grid, .active-market-grid, .news-feed-grid, .market-command-grid, .market-form-grid { grid-template-columns: 1fr; }
