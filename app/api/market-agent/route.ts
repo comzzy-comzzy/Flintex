@@ -1,9 +1,16 @@
 import { NextResponse } from 'next/server'
+import { execFile as execFileCb } from 'node:child_process'
+import { mkdtemp, writeFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { promisify } from 'node:util'
 
 export const runtime = 'nodejs'
 
 const FREEMODEL_URL = 'https://cc.freemodel.dev/v1/messages'
 const FREEMODEL_MODEL = 'claude-haiku-4-5-20251001'
+const CLAUDE_CLI_MODEL = FREEMODEL_MODEL
+const CLAUDE_CLI_BASE_URL = 'https://cc.freemodel.dev'
+const execFile = promisify(execFileCb)
 
 type MarketIdea = {
   title: string
@@ -21,6 +28,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> => typeof va
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, Math.round(value)))
 
 const cleanString = (value: unknown, fallback = '') => {
+  if (typeof value === 'boolean' || typeof value === 'number') return String(value)
   if (typeof value !== 'string') return fallback
 
   const cleaned = value.replace(/\s+/g, ' ').trim()
@@ -33,6 +41,11 @@ const parseNumber = (value: unknown) => {
 
   const parsed = Number(value.replace(/[^0-9.-]/g, ''))
   return Number.isFinite(parsed) ? parsed : null
+}
+
+const cleanNewsString = (value: unknown, fallback: string) => {
+  if (typeof value === 'boolean') return fallback
+  return cleanString(value, fallback)
 }
 
 const stringifyForLog = (value: unknown) => {
@@ -98,8 +111,11 @@ const normalizeMarket = (value: unknown): MarketIdea | null => {
   const resolutionCriteria = cleanString(value.resolutionCriteria ?? value.resolution)
   const deadline = cleanString(value.deadline)
   const initialLiquidity = cleanString(value.initialLiquidity)
-  const category = cleanString(value.category)
-  const triggeredByNews = cleanString(value.triggeredByNews ?? value.news)
+  const category = cleanString(value.category, 'Macro')
+  const triggeredByNews = cleanNewsString(
+    value.triggeredByNews ?? value.news,
+    'Current macroeconomic conditions and scheduled public data releases.',
+  )
   const probability = parseNumber(value.aiProbability ?? value.probability)
 
   if (!title || !description || !resolutionCriteria || !deadline || !initialLiquidity || !category || !triggeredByNews || probability === null) {
@@ -135,6 +151,43 @@ const parseMarkets = (text: string) => {
   return markets.slice(0, 3)
 }
 
+const runClaudeCodeFallback = async (prompt: string, apiKey: string) => {
+  const tempDir = await mkdtemp(`${tmpdir()}/flintex-claude-`)
+  const settingsPath = `${tempDir}/settings.json`
+
+  try {
+    await writeFile(settingsPath, JSON.stringify({
+      env: {
+        ANTHROPIC_BASE_URL: CLAUDE_CLI_BASE_URL,
+        ANTHROPIC_API_KEY: apiKey,
+      },
+    }))
+
+    const { stdout, stderr } = await execFile('claude', [
+      '--bare',
+      '--print',
+      '--model',
+      CLAUDE_CLI_MODEL,
+      '--settings',
+      settingsPath,
+      '--max-budget-usd',
+      '0.05',
+      prompt,
+    ], {
+      timeout: 120_000,
+      maxBuffer: 1_048_576,
+    })
+
+    if (stderr?.trim()) {
+      console.log('[MarketAgent] Claude CLI stderr', stderr.trim())
+    }
+
+    return typeof stdout === 'string' ? stdout : String(stdout)
+  } finally {
+    await rm(tempDir, { recursive: true, force: true })
+  }
+}
+
 export async function POST() {
   const apiKey = process.env.FREEMODEL_API_KEY
 
@@ -144,9 +197,10 @@ export async function POST() {
   }
 
   const prompt = [
-    'Return only a JSON array of exactly 3 prediction market ideas about current macro events.',
+    'Return only valid JSON. Do not include markdown fences, prose, notes, or explanations.',
+    'Return a JSON array of exactly 3 prediction market ideas about current macro events.',
     'Each object must have: title, description, resolutionCriteria, deadline, initialLiquidity, aiProbability, category, triggeredByNews.',
-    'deadline must be YYYY-MM-DD. initialLiquidity must be a USDC amount string like "100 USDC".',
+    'deadline must be YYYY-MM-DD. initialLiquidity must be a realistic small testnet USDC amount string between "5 USDC" and "20 USDC".',
     'aiProbability must be the probability from 0 to 100 that YES resolves true.',
     'Markets must be specific, time-bound, binary, and resolvable from public data.',
   ].join('\n')
@@ -201,7 +255,19 @@ export async function POST() {
     }
 
     const text = extractText(body)
-    const markets = parseMarkets(text)
+    let markets: MarketIdea[] = []
+
+    try {
+      markets = parseMarkets(text)
+    } catch (parseError) {
+      if (!/Please use Claude Code CLI/i.test(text)) {
+        throw parseError
+      }
+
+      console.warn('[MarketAgent] FreeModel requested Claude CLI fallback.')
+      const cliText = await runClaudeCodeFallback(prompt, apiKey)
+      markets = parseMarkets(cliText)
+    }
 
     return NextResponse.json(markets)
   } catch (error) {
