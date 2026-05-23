@@ -29,6 +29,52 @@ body {
   color: var(--text);
   font-family: 'Geist', sans-serif;
   overflow-x: hidden;
+  position: relative;
+  isolation: isolate;
+}
+
+.ghost-background {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  overflow: hidden;
+}
+
+.ghost-icon-shell {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #67e8f9;
+  opacity: 0.04;
+  animation-name: ghostFloat;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+
+.ghost-icon {
+  width: 100%;
+  height: 100%;
+}
+
+@keyframes ghostFloat {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  25% {
+    transform: translate3d(calc(var(--ghost-dx) * 0.25), calc(var(--ghost-dy) * -0.18), 0) rotate(calc(var(--ghost-rotation) * 0.25));
+  }
+  50% {
+    transform: translate3d(calc(var(--ghost-dx) * 0.5), calc(var(--ghost-dy) * 0.35), 0) rotate(calc(var(--ghost-rotation) * 0.5));
+  }
+  75% {
+    transform: translate3d(calc(var(--ghost-dx) * 0.78), calc(var(--ghost-dy) * 0.16), 0) rotate(calc(var(--ghost-rotation) * 0.78));
+  }
+  100% {
+    transform: translate3d(calc(var(--ghost-dx) * 1), calc(var(--ghost-dy) * 1), 0) rotate(var(--ghost-rotation));
+  }
 }
 
 /* Portfolio Dashboard */

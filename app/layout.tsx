@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import GhostBackground from "@/components/GhostBackground";
 import { Providers } from "./providers";
 import "./globals.css";
 
@@ -20,6 +21,7 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist+Mono:wght@300;400;500&family=Geist:wght@300;400;500&display=swap" rel="stylesheet" />
       </head>
       <body>
+        <GhostBackground />
         <Providers>
           {children}
         </Providers>
