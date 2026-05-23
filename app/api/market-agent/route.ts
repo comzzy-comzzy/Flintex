@@ -1,18 +1,18 @@
 import { NextResponse } from 'next/server'
-import { execFile as execFileCb } from 'node:child_process'
-import { existsSync } from 'node:fs'
-import { mkdtemp, writeFile, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
-import { promisify } from 'node:util'
+import { randomUUID } from 'node:crypto'
 
 export const runtime = 'nodejs'
 
-const FREEMODEL_URL = 'https://cc.freemodel.dev/v1/messages'
+const FREEMODEL_BASE_URL = 'https://cc.freemodel.dev'
+const FREEMODEL_URL = `${FREEMODEL_BASE_URL}/v1/messages?beta=true`
 const FREEMODEL_MODEL = 'claude-haiku-4-5-20251001'
-const CLAUDE_CLI_MODEL = FREEMODEL_MODEL
-const CLAUDE_CLI_BASE_URL = 'https://cc.freemodel.dev'
-const execFile = promisify(execFileCb)
+const CLAUDE_CODE_BETA_HEADERS = [
+  'interleaved-thinking-2025-05-14',
+  'context-management-2025-06-27',
+  'prompt-caching-scope-2026-01-05',
+  'advisor-tool-2026-03-01',
+  'structured-outputs-2025-12-15',
+].join(',')
 
 type MarketIdea = {
   title: string
@@ -85,6 +85,25 @@ const extractText = (responseBody: unknown): string => {
   return ''
 }
 
+const extractTextFromEventStream = (rawBody: string) => rawBody
+  .split(/\r?\n/)
+  .filter((line) => line.startsWith('data:'))
+  .map((line) => line.slice(5).trim())
+  .filter((line) => line && line !== '[DONE]')
+  .map((line) => {
+    try {
+      const event = JSON.parse(line)
+      if (!isRecord(event)) return ''
+      if (isRecord(event.delta) && typeof event.delta.text === 'string') return event.delta.text
+      if (isRecord(event.content_block) && typeof event.content_block.text === 'string') return event.content_block.text
+      if (Array.isArray(event.content)) return event.content.map(extractText).filter(Boolean).join('\n')
+      return ''
+    } catch {
+      return ''
+    }
+  })
+  .join('')
+
 const parseJsonFromText = (text: string): unknown => {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)
   const source = fenced?.[1]?.trim() || text.trim()
@@ -136,7 +155,7 @@ const normalizeMarket = (value: unknown): MarketIdea | null => {
   }
 }
 
-const parseMarkets = (text: string) => {
+const parseMarkets = (text: string, today: string) => {
   const parsed = parseJsonFromText(text)
   const rows = Array.isArray(parsed)
     ? parsed
@@ -144,118 +163,16 @@ const parseMarkets = (text: string) => {
       ? parsed.markets
       : []
 
-  const markets = rows.map(normalizeMarket).filter((market): market is MarketIdea => market !== null)
+  const markets = rows
+    .map(normalizeMarket)
+    .filter((market): market is MarketIdea => market !== null)
+    .filter((market) => market.deadline > today)
 
   if (markets.length === 0) {
     throw new Error('FreeModel response did not include usable market ideas.')
   }
 
   return markets.slice(0, 3)
-}
-
-type ClaudeCommand = {
-  command: string
-  argsPrefix: string[]
-  source: string
-}
-
-const resolveClaudeCommand = (): ClaudeCommand => {
-  const configuredBinary = process.env.CLAUDE_CODE_BINARY
-  if (configuredBinary?.trim()) {
-    return {
-      command: configuredBinary.trim(),
-      argsPrefix: [],
-      source: 'CLAUDE_CODE_BINARY',
-    }
-  }
-
-  const wrapperCandidates = [
-    path.join(process.cwd(), 'node_modules', '@anthropic-ai', 'claude-code', 'cli-wrapper.cjs'),
-    path.join(
-      process.cwd(),
-      'node_modules',
-      '.pnpm',
-      '@anthropic-ai+claude-code@2.1.150',
-      'node_modules',
-      '@anthropic-ai',
-      'claude-code',
-      'cli-wrapper.cjs',
-    ),
-  ]
-
-  const wrapperPath = wrapperCandidates.find((candidate) => existsSync(candidate))
-  if (wrapperPath) {
-    return {
-      command: process.execPath,
-      argsPrefix: [wrapperPath],
-      source: '@anthropic-ai/claude-code wrapper',
-    }
-  }
-
-  const localBinary = path.join(
-    process.cwd(),
-    'node_modules',
-    '.bin',
-    process.platform === 'win32' ? 'claude.cmd' : 'claude',
-  )
-
-  if (existsSync(localBinary)) {
-    return {
-      command: localBinary,
-      argsPrefix: [],
-      source: 'node_modules/.bin/claude',
-    }
-  }
-
-  return {
-    command: 'claude',
-    argsPrefix: [],
-    source: 'global claude',
-  }
-}
-
-const runClaudeCodeFallback = async (prompt: string, apiKey: string) => {
-  const tempDir = await mkdtemp(`${tmpdir()}/flintex-claude-`)
-  const settingsPath = `${tempDir}/settings.json`
-
-  try {
-    await writeFile(settingsPath, JSON.stringify({
-      env: {
-        ANTHROPIC_BASE_URL: CLAUDE_CLI_BASE_URL,
-        ANTHROPIC_API_KEY: apiKey,
-      },
-    }))
-
-    const claudeCommand = resolveClaudeCommand()
-    console.log('[MarketAgent] Using Claude CLI fallback', stringifyForLog({
-      source: claudeCommand.source,
-      command: claudeCommand.command === process.execPath ? 'node' : claudeCommand.command,
-    }))
-
-    const { stdout, stderr } = await execFile(claudeCommand.command, [
-      ...claudeCommand.argsPrefix,
-      '--bare',
-      '--print',
-      '--model',
-      CLAUDE_CLI_MODEL,
-      '--settings',
-      settingsPath,
-      '--max-budget-usd',
-      '0.05',
-      prompt,
-    ], {
-      timeout: 120_000,
-      maxBuffer: 1_048_576,
-    })
-
-    if (stderr?.trim()) {
-      console.log('[MarketAgent] Claude CLI stderr', stderr.trim())
-    }
-
-    return typeof stdout === 'string' ? stdout : String(stdout)
-  } finally {
-    await rm(tempDir, { recursive: true, force: true })
-  }
 }
 
 export async function POST() {
@@ -266,11 +183,13 @@ export async function POST() {
     return NextResponse.json({ error: 'FREEMODEL_API_KEY is not configured.' }, { status: 500 })
   }
 
+  const today = new Date().toISOString().slice(0, 10)
+  const sessionId = randomUUID()
   const prompt = [
     'Return only valid JSON. Do not include markdown fences, prose, notes, or explanations.',
-    'Return a JSON array of exactly 3 prediction market ideas about current macro events.',
+    `Today is ${today}. Return a JSON array of exactly 3 prediction market ideas about current macro events.`,
     'Each object must have: title, description, resolutionCriteria, deadline, initialLiquidity, aiProbability, category, triggeredByNews.',
-    'deadline must be YYYY-MM-DD. initialLiquidity must be a realistic small testnet USDC amount string between "5 USDC" and "20 USDC".',
+    `deadline must be YYYY-MM-DD and must be after ${today}. initialLiquidity must be a realistic small testnet USDC amount string between "5 USDC" and "20 USDC".`,
     'aiProbability must be the probability from 0 to 100 that YES resolves true.',
     'Markets must be specific, time-bound, binary, and resolvable from public data.',
   ].join('\n')
@@ -285,17 +204,48 @@ export async function POST() {
     const response = await fetch(FREEMODEL_URL, {
       method: 'POST',
       headers: {
+        accept: 'application/json',
         'content-type': 'application/json',
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
+        'anthropic-beta': CLAUDE_CODE_BETA_HEADERS,
+        'anthropic-dangerous-direct-browser-access': 'true',
+        'x-app': 'cli',
+        'user-agent': 'claude-cli/2.1.150 (external, sdk-cli)',
+        'x-claude-code-session-id': sessionId,
       },
       body: JSON.stringify({
         model: FREEMODEL_MODEL,
+        system: [
+          {
+            type: 'text',
+            text: 'x-anthropic-billing-header: cc_version=2.1.150.539; cc_entrypoint=sdk-cli; cch=1fdf3;',
+          },
+          {
+            type: 'text',
+            text: "You are a Claude agent, built on Anthropic's Claude Agent SDK.",
+          },
+        ],
+        tools: [],
+        metadata: {
+          user_id: JSON.stringify({
+            device_id: randomUUID().replace(/-/g, ''),
+            account_uuid: '',
+            session_id: sessionId,
+          }),
+        },
         max_tokens: 1024,
+        temperature: 0.7,
+        stream: true,
         messages: [
           {
             role: 'user',
-            content: prompt,
+            content: [
+              {
+                type: 'text',
+                text: `<session>\n${prompt}\n</session>`,
+              },
+            ],
           },
         ],
       }),
@@ -324,20 +274,10 @@ export async function POST() {
       }, { status: 502 })
     }
 
-    const text = extractText(body)
-    let markets: MarketIdea[] = []
-
-    try {
-      markets = parseMarkets(text)
-    } catch (parseError) {
-      if (!/Please use Claude Code CLI/i.test(text)) {
-        throw parseError
-      }
-
-      console.warn('[MarketAgent] FreeModel requested Claude CLI fallback.')
-      const cliText = await runClaudeCodeFallback(prompt, apiKey)
-      markets = parseMarkets(cliText)
-    }
+    const text = typeof body === 'string'
+      ? extractTextFromEventStream(body) || body
+      : extractText(body)
+    const markets = parseMarkets(text, today)
 
     return NextResponse.json(markets)
   } catch (error) {

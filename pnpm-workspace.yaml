@@ -1,5 +1,4 @@
 allowBuilds:
-  '@anthropic-ai/claude-code': true
   esbuild: true
   keccak: true
   msw: true

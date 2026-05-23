@@ -5,12 +5,6 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: process.cwd(),
   },
-  outputFileTracingIncludes: {
-    '/api/market-agent': [
-      './node_modules/@anthropic-ai/claude-code/**/*',
-      './node_modules/.pnpm/@anthropic-ai+claude-code*/**/*',
-    ],
-  },
 };
 
 export default nextConfig;
