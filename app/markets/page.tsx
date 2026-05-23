@@ -1,23 +1,44 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
-import { Activity, CircleDollarSign, Newspaper, Plus, RefreshCw, Send } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Activity, CheckCircle2, CircleDollarSign, Plus, RefreshCw, Send } from 'lucide-react'
 import Navbar from '@/components/Navbar'
-import { useAccount } from 'wagmi'
+import { formatUnits, parseEventLogs, parseUnits, type Log } from 'viem'
+import { useAccount, usePublicClient, useReadContract, useReadContracts, useSwitchChain, useWriteContract } from 'wagmi'
+import {
+  ARC_TESTNET_CHAIN_ID,
+  ERC20_APPROVE_ABI,
+  PREDICTION_MARKET_ABI,
+  PREDICTION_MARKET_ADDRESS,
+  USDC_ADDRESS,
+  USDC_DECIMALS,
+} from '@/lib/prediction-market'
 
 type MarketSide = 'YES' | 'NO'
 type ScanState = 'READY' | 'SCANNING' | 'COMPLETE' | 'ERROR'
+type BetStep = 'idle' | 'approving' | 'betting' | 'confirmed'
 
-type NewsSignal = {
-  headline: string
-  source: string
-  timestamp: string
-  relevanceScore: number
-  summary: string
+type ContractMarket = {
+  id: bigint
+  marketId: string
+  creator: string
+  title: string
+  description: string
+  resolutionCriteria: string
+  deadline: bigint
+  aiProbability: number
+  category: string
+  triggeredByNews: string
+  totalYes: bigint
+  totalNo: bigint
+  liquidity: bigint
+  pool: bigint
+  outcome: number
+  resolved: boolean
 }
 
-type ActiveMarket = {
+type MarketDraft = {
   id: string
   title: string
   description: string
@@ -25,11 +46,11 @@ type ActiveMarket = {
   deadline: string
   initialLiquidity: string
   aiProbability: number
-  crowdOdds: number
   category: string
   triggeredByNews: string
-  spawnedAt: string
 }
+
+type MarketInput = Omit<MarketDraft, 'id'>
 
 type MarketFormState = {
   title: string
@@ -37,125 +58,23 @@ type MarketFormState = {
   resolutionCriteria: string
   deadline: string
   initialLiquidity: string
-}
-
-type ResolvedMarket = {
-  title: string
+  aiProbability: string
   category: string
-  resolved: string
-  outcome: string
-  pool: string
-  accuracy: string
+  triggeredByNews: string
 }
 
-const BET_SIZE_USDC = 25
+type BetModalState = {
+  market: ContractMarket
+  side: MarketSide
+  amount: string
+}
 
-const initialFeed: NewsSignal[] = [
-  {
-    headline: 'Fed speakers keep focus on sticky services inflation',
-    source: 'Macro Desk',
-    timestamp: '8m ago',
-    relevanceScore: 92,
-    summary: 'Rate-path uncertainty keeps the next FOMC decision marketable.',
-  },
-  {
-    headline: 'Oil shipping risk rises after renewed Red Sea disruption reports',
-    source: 'Geopolitics Wire',
-    timestamp: '16m ago',
-    relevanceScore: 88,
-    summary: 'Energy transport risk can feed oil and inflation-linked markets.',
-  },
-  {
-    headline: 'Treasury yields slip after weaker manufacturing data',
-    source: 'Rates Feed',
-    timestamp: '25m ago',
-    relevanceScore: 81,
-    summary: 'Softer growth data raises demand for yield and policy markets.',
-  },
-  {
-    headline: 'Euro volatility climbs before ECB policy remarks',
-    source: 'FX Monitor',
-    timestamp: '37m ago',
-    relevanceScore: 76,
-    summary: 'FX options imply a wider outcome range around ECB communication.',
-  },
-  {
-    headline: 'Election polling spread narrows in key swing states',
-    source: 'Political Risk',
-    timestamp: '49m ago',
-    relevanceScore: 71,
-    summary: 'Polling compression creates resolvable political-risk markets.',
-  },
-]
-
-const initialMarkets: ActiveMarket[] = [
-  {
-    id: 'fed-hold',
-    title: 'Fed holds rates at the next FOMC meeting',
-    description: 'Market on whether the next Federal Reserve decision leaves the target range unchanged.',
-    resolutionCriteria: 'YES if the official FOMC statement announces no change to the target range.',
-    deadline: '2026-06-11',
-    initialLiquidity: '$5,000 USDC',
-    aiProbability: 64,
-    crowdOdds: 47,
-    category: 'Rates',
-    triggeredByNews: initialFeed[0].headline,
-    spawnedAt: '14:32',
-  },
-  {
-    id: 'brent-90',
-    title: 'Front-month Brent settles above $90 before deadline',
-    description: 'Market tracking whether renewed shipping risk pushes Brent above the stated threshold.',
-    resolutionCriteria: 'YES if front-month Brent crude settles above $90 on any official close before the deadline.',
-    deadline: '2026-06-14',
-    initialLiquidity: '$3,750 USDC',
-    aiProbability: 57,
-    crowdOdds: 39,
-    category: 'Energy',
-    triggeredByNews: initialFeed[1].headline,
-    spawnedAt: '14:19',
-  },
-  {
-    id: 'ten-year-yield',
-    title: 'US 10Y yield closes below 4.25% this week',
-    description: 'Market on whether weak activity data pulls long-end yields lower before the weekly close.',
-    resolutionCriteria: 'YES if the US 10-year Treasury yield closes below 4.25% on the reference data source before deadline.',
-    deadline: '2026-06-07',
-    initialLiquidity: '$4,200 USDC',
-    aiProbability: 61,
-    crowdOdds: 55,
-    category: 'Rates',
-    triggeredByNews: initialFeed[2].headline,
-    spawnedAt: '14:05',
-  },
-]
-
-const resolvedMarkets: ResolvedMarket[] = [
-  {
-    title: 'ECB keeps deposit rate unchanged',
-    category: 'Rates',
-    resolved: 'May 17',
-    outcome: 'YES',
-    pool: '$7,840 USDC',
-    accuracy: 'AI 68% / crowd 51%',
-  },
-  {
-    title: 'WTI closes above $82 after inventory report',
-    category: 'Energy',
-    resolved: 'May 15',
-    outcome: 'NO',
-    pool: '$4,120 USDC',
-    accuracy: 'AI 42% / crowd 58%',
-  },
-  {
-    title: 'US jobless claims exceed consensus',
-    category: 'Macro',
-    resolved: 'May 14',
-    outcome: 'YES',
-    pool: '$5,510 USDC',
-    accuracy: 'AI 63% / crowd 49%',
-  },
-]
+type UserPosition = {
+  yesAmount: bigint
+  noAmount: bigint
+  claimed: boolean
+  payout: bigint
+}
 
 const emptyForm: MarketFormState = {
   title: '',
@@ -163,114 +82,425 @@ const emptyForm: MarketFormState = {
   resolutionCriteria: '',
   deadline: '',
   initialLiquidity: '',
+  aiProbability: '',
+  category: '',
+  triggeredByNews: '',
 }
 
-const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, Math.round(value)))
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
 
-const cleanText = (value: unknown, fallback: string) => {
+const round = (value: number, decimals = 1) => {
+  const factor = 10 ** decimals
+  return Math.round((value + Number.EPSILON) * factor) / factor
+}
+
+const cleanText = (value: unknown, fallback = '') => {
   if (typeof value !== 'string') return fallback
-
   const cleaned = value.replace(/\s+/g, ' ').trim()
   return cleaned || fallback
 }
 
-const parseNumber = (value: unknown, fallback: number) => {
+const parseNumber = (value: unknown) => {
   if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value !== 'string') return fallback
-
+  if (typeof value !== 'string') return null
   const parsed = Number(value.replace(/[^0-9.-]/g, ''))
-  return Number.isFinite(parsed) ? parsed : fallback
+  return Number.isFinite(parsed) ? parsed : null
 }
 
-const parseLiquidity = (value: string) => parseNumber(value, 0)
-
-const formatUsdc = (value: number) =>
-  `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(value)} USDC`
-
-const formatPool = (value: number) => `$${formatUsdc(value)}`
-
-const formatNewsTime = (value: string) => {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value || 'just now'
-
-  return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+const parseAiProbability = (value: unknown) => {
+  const parsed = parseNumber(value)
+  if (parsed === null) return null
+  const percent = parsed > 0 && parsed <= 1 ? parsed * 100 : parsed
+  return round(clamp(percent, 0, 100), 1)
 }
 
-const formatSpawnTime = () =>
-  new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })
+const parseUsdcAmount = (value: string) => {
+  const cleaned = value.replace(/[^0-9.]/g, '').trim()
+  if (!cleaned) return 0n
 
-const getDeadlineCountdown = (deadline: string) => {
-  const date = new Date(`${deadline}T23:59:59`)
-  if (Number.isNaN(date.getTime())) return 'Pending date'
-
-  const diff = date.getTime() - Date.now()
-  if (diff <= 0) return 'Resolving'
-
-  const days = Math.floor(diff / 86_400_000)
-  const hours = Math.floor((diff % 86_400_000) / 3_600_000)
-
-  if (days > 0) return `${days}d ${hours}h`
-  return `${Math.max(1, hours)}h`
-}
-
-const deriveCrowdOdds = (title: string, index: number, aiProbability: number) => {
-  const hash = Array.from(title).reduce((sum, char) => sum + char.charCodeAt(0), index * 17)
-  const offset = (hash % 35) - 17
-
-  return clamp(aiProbability + offset, 5, 95)
-}
-
-const getDisagreement = (market: ActiveMarket) => Math.abs(market.aiProbability - market.crowdOdds)
-
-const normalizeNews = (item: Record<string, unknown>, index: number): NewsSignal => ({
-  headline: cleanText(item.headline ?? item.title, 'Macro headline detected'),
-  source: cleanText(item.source, 'Macro News'),
-  timestamp: formatNewsTime(cleanText(item.publishedAt ?? item.timestamp, 'just now')),
-  relevanceScore: clamp(parseNumber(item.relevanceScore, 70 - index * 4), 0, 100),
-  summary: cleanText(item.summary ?? item.description, 'MarketAgent is monitoring this headline for a resolvable market.'),
-})
-
-const normalizeMarket = (market: Record<string, unknown>, index: number): ActiveMarket => {
-  const title = cleanText(market.title, 'Untitled prediction market')
-  const aiProbability = clamp(parseNumber(market.aiProbability, 55), 1, 99)
-
-  return {
-    id: `${title}-${Date.now()}-${index}`,
-    title,
-    description: cleanText(market.description, 'No description provided.'),
-    resolutionCriteria: cleanText(market.resolutionCriteria, 'Resolution criteria pending.'),
-    deadline: cleanText(market.deadline, new Date().toISOString().slice(0, 10)),
-    initialLiquidity: cleanText(market.initialLiquidity, '$2,500 USDC'),
-    aiProbability,
-    crowdOdds: deriveCrowdOdds(title, index, aiProbability),
-    category: cleanText(market.category, 'Macro'),
-    triggeredByNews: cleanText(market.triggeredByNews, 'Breaking macro headline'),
-    spawnedAt: formatSpawnTime(),
+  try {
+    return parseUnits(cleaned, USDC_DECIMALS)
+  } catch {
+    return 0n
   }
 }
 
+const formatUsdcAmount = (value: bigint) => {
+  const formatted = formatUnits(value, USDC_DECIMALS)
+  const numeric = Number(formatted)
+  if (Number.isFinite(numeric)) {
+    return `${new Intl.NumberFormat('en-US', {
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 2,
+    }).format(numeric)} USDC`
+  }
+  return `${formatted} USDC`
+}
+
+const formatPercent = (value: number) => `${round(value, 1).toFixed(1)}%`
+
+const formatDeadline = (deadline: bigint) => {
+  if (deadline === 0n) return 'No deadline'
+  return new Date(Number(deadline) * 1000).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
+const parseDeadlineTimestamp = (deadline: string) => {
+  if (!deadline) return 0n
+  const timestamp = Math.floor(new Date(`${deadline}T23:59:59Z`).getTime() / 1000)
+  return Number.isFinite(timestamp) && timestamp > 0 ? BigInt(timestamp) : 0n
+}
+
+const currentUnixSeconds = () => Math.floor(Date.now() / 1000)
+
+const toBigIntValue = (value: unknown) => (typeof value === 'bigint' ? value : 0n)
+
+const toNumberValue = (value: unknown) => {
+  if (typeof value === 'bigint') return Number(value)
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  return 0
+}
+
+const normalizeUserPosition = (value: unknown) => {
+  if (!Array.isArray(value) || value.length < 3) {
+    return { yesAmount: 0n, noAmount: 0n, claimed: false }
+  }
+
+  return {
+    yesAmount: toBigIntValue(value[0]),
+    noAmount: toBigIntValue(value[1]),
+    claimed: Boolean(value[2]),
+  }
+}
+
+const normalizeContractMarket = (marketId: bigint, value: unknown): ContractMarket | null => {
+  if (!Array.isArray(value) || value.length < 14) return null
+
+  const title = cleanText(value[1])
+  if (!title) return null
+
+  return {
+    id: marketId,
+    marketId: marketId.toString(),
+    creator: cleanText(value[0]),
+    title,
+    description: cleanText(value[2]),
+    resolutionCriteria: cleanText(value[3]),
+    deadline: toBigIntValue(value[4]),
+    aiProbability: clamp(toNumberValue(value[5]), 0, 100),
+    category: cleanText(value[6]),
+    triggeredByNews: cleanText(value[7]),
+    totalYes: toBigIntValue(value[8]),
+    totalNo: toBigIntValue(value[9]),
+    liquidity: toBigIntValue(value[10]),
+    pool: toBigIntValue(value[11]),
+    outcome: toNumberValue(value[12]),
+    resolved: Boolean(value[13]),
+  }
+}
+
+const normalizeMarketDraft = (value: unknown): MarketDraft | null => {
+  if (typeof value !== 'object' || value === null) return null
+
+  const item = value as Record<string, unknown>
+  const title = cleanText(item.title)
+  const description = cleanText(item.description)
+  const resolutionCriteria = cleanText(item.resolutionCriteria)
+  const deadline = cleanText(item.deadline)
+  const initialLiquidity = cleanText(item.initialLiquidity)
+  const aiProbability = parseAiProbability(item.aiProbability)
+  const category = cleanText(item.category)
+  const triggeredByNews = cleanText(item.triggeredByNews)
+
+  if (!title || !description || !resolutionCriteria || !deadline || !initialLiquidity || aiProbability === null || !category || !triggeredByNews) {
+    return null
+  }
+
+  return {
+    id: `${title}-${deadline}`.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+    title,
+    description,
+    resolutionCriteria,
+    deadline,
+    initialLiquidity,
+    aiProbability,
+    category,
+    triggeredByNews,
+  }
+}
+
+const getCrowdOdds = (market: ContractMarket) => {
+  const volume = market.totalYes + market.totalNo
+  if (volume === 0n) return null
+  return Number((market.totalYes * 10_000n) / volume) / 100
+}
+
+const getBetDecimalOdds = (market: ContractMarket, side: MarketSide) => {
+  const crowdOdds = getCrowdOdds(market)
+  if (crowdOdds === null) return null
+
+  const impliedProbability = side === 'YES' ? crowdOdds : 100 - crowdOdds
+  if (impliedProbability <= 0) return null
+  return 100 / impliedProbability
+}
+
+const quotePotentialPayout = (market: ContractMarket, side: MarketSide, amount: bigint) => {
+  if (amount <= 0n) return 0n
+
+  const sideTotal = side === 'YES' ? market.totalYes : market.totalNo
+  const totalSideBets = sideTotal + amount
+  if (totalSideBets === 0n) return 0n
+
+  const opposingSideBets = side === 'YES' ? market.totalNo : market.totalYes
+  return amount + ((amount * opposingSideBets) / totalSideBets)
+}
+
+const buildMarketInput = (value: MarketDraft | MarketInput): MarketInput => ({
+  title: value.title,
+  description: value.description,
+  resolutionCriteria: value.resolutionCriteria,
+  deadline: value.deadline,
+  initialLiquidity: value.initialLiquidity,
+  aiProbability: value.aiProbability,
+  category: value.category,
+  triggeredByNews: value.triggeredByNews,
+})
+
 export default function MarketsPage() {
-  const { isConnected } = useAccount()
+  const { address, isConnected } = useAccount()
+  const { switchChainAsync } = useSwitchChain()
+  const publicClient = usePublicClient({ chainId: ARC_TESTNET_CHAIN_ID })
+  const { writeContractAsync, isPending } = useWriteContract()
+  const approveWrite = useWriteContract()
+
   const [loading, setLoading] = useState(false)
   const [scanState, setScanState] = useState<ScanState>('READY')
-  const [feed, setFeed] = useState(initialFeed)
-  const [markets, setMarkets] = useState(initialMarkets)
   const [form, setForm] = useState<MarketFormState>(emptyForm)
-  const [agentLog, setAgentLog] = useState<string[]>([
-    'MarketAgent ready. Live macro and geopolitical feed is standing by.',
-  ])
+  const [agentLog, setAgentLog] = useState<string[]>(['MarketAgent is idle.'])
+  const [drafts, setDrafts] = useState<MarketDraft[]>([])
+  const [creatingDraftId, setCreatingDraftId] = useState<string | null>(null)
+  const [betModal, setBetModal] = useState<BetModalState | null>(null)
+  const [txError, setTxError] = useState<string | null>(null)
+  const [txSuccess, setTxSuccess] = useState<string | null>(null)
+  const [betStep, setBetStep] = useState<BetStep>('idle')
+  const [approvalHash, setApprovalHash] = useState<string | null>(null)
+  const [betHash, setBetHash] = useState<string | null>(null)
+  const [nowSeconds, setNowSeconds] = useState(currentUnixSeconds)
 
-  const highAlphaCount = useMemo(() => markets.filter((market) => getDisagreement(market) > 15).length, [markets])
-  const totalPool = useMemo(() => markets.reduce((sum, market) => sum + parseLiquidity(market.initialLiquidity), 0), [markets])
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowSeconds(currentUnixSeconds()), 30_000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  const {
+    data: marketCountData,
+    isLoading: marketCountLoading,
+    refetch: refetchMarketCount,
+  } = useReadContract({
+    address: PREDICTION_MARKET_ADDRESS,
+    abi: PREDICTION_MARKET_ABI,
+    functionName: 'marketCount',
+    chainId: ARC_TESTNET_CHAIN_ID,
+  })
+
+  const marketCount = typeof marketCountData === 'bigint' ? marketCountData : 0n
+
+  const marketIds = useMemo(
+    () => Array.from({ length: Number(marketCount) }, (_, index) => BigInt(index)),
+    [marketCount],
+  )
+
+  const marketReadContracts = useMemo(() => marketIds.map((marketId) => ({
+    address: PREDICTION_MARKET_ADDRESS,
+    abi: PREDICTION_MARKET_ABI,
+    functionName: 'markets',
+    args: [marketId],
+    chainId: ARC_TESTNET_CHAIN_ID,
+  } as const)), [marketIds])
+
+  const {
+    data: marketResults,
+    isLoading: marketsLoading,
+    refetch: refetchMarkets,
+  } = useReadContracts({
+    contracts: marketReadContracts,
+    query: { enabled: marketReadContracts.length > 0 },
+  })
+
+  const markets = useMemo(() => (marketResults ?? [])
+    .map((result, index) => (result.status === 'success'
+      ? normalizeContractMarket(marketIds[index], result.result)
+      : null))
+    .filter((market): market is ContractMarket => market !== null),
+  [marketIds, marketResults])
+
+  const positionReadContracts = useMemo(() => address ? markets.map((market) => ({
+    address: PREDICTION_MARKET_ADDRESS,
+    abi: PREDICTION_MARKET_ABI,
+    functionName: 'getPosition',
+    args: [market.id, address],
+    chainId: ARC_TESTNET_CHAIN_ID,
+  } as const)) : [], [address, markets])
+
+  const {
+    data: positionResults,
+    refetch: refetchPositions,
+  } = useReadContracts({
+    contracts: positionReadContracts,
+    query: { enabled: positionReadContracts.length > 0 },
+  })
+
+  const payoutQuoteReadContracts = useMemo(() => address ? markets.map((market) => ({
+    address: PREDICTION_MARKET_ADDRESS,
+    abi: PREDICTION_MARKET_ABI,
+    functionName: 'quotePayout',
+    args: [market.id, address],
+    chainId: ARC_TESTNET_CHAIN_ID,
+  } as const)) : [], [address, markets])
+
+  const {
+    data: payoutQuoteResults,
+    refetch: refetchPayoutQuotes,
+  } = useReadContracts({
+    contracts: payoutQuoteReadContracts,
+    query: { enabled: payoutQuoteReadContracts.length > 0 },
+  })
+
+  const userPositions = useMemo(() => {
+    const nextPositions = new Map<string, UserPosition>()
+
+    markets.forEach((market, index) => {
+      const positionResult = positionResults?.[index]
+      const payoutResult = payoutQuoteResults?.[index]
+      const position = positionResult?.status === 'success'
+        ? normalizeUserPosition(positionResult.result)
+        : { yesAmount: 0n, noAmount: 0n, claimed: false }
+      const payout = payoutResult?.status === 'success' && typeof payoutResult.result === 'bigint'
+        ? payoutResult.result
+        : 0n
+
+      nextPositions.set(market.marketId, { ...position, payout })
+    })
+
+    return nextPositions
+  }, [markets, payoutQuoteResults, positionResults])
+
+  const totalPool = useMemo(() => markets.reduce((sum, market) => sum + market.pool, 0n), [markets])
+  const highAlphaCount = useMemo(() => markets.filter((market) => {
+    const crowdOdds = getCrowdOdds(market)
+    return crowdOdds !== null && Math.abs(market.aiProbability - crowdOdds) > 15
+  }).length, [markets])
+
+  const selectedBetMarket = useMemo(() => {
+    if (!betModal) return null
+    return markets.find((market) => market.marketId === betModal.market.marketId) ?? betModal.market
+  }, [betModal, markets])
+
+  const betAmountUnits = useMemo(() => (betModal ? parseUsdcAmount(betModal.amount) : 0n), [betModal])
+  const selectedCrowdOdds = selectedBetMarket ? getCrowdOdds(selectedBetMarket) : null
+  const selectedBetImpliedOdds = selectedCrowdOdds !== null && betModal
+    ? betModal.side === 'YES' ? selectedCrowdOdds : 100 - selectedCrowdOdds
+    : null
+  const selectedDecimalOdds = selectedBetMarket && betModal ? getBetDecimalOdds(selectedBetMarket, betModal.side) : null
+  const transactionPending = loading || isPending || approveWrite.isPending
+  const isReadingMarkets = marketCountLoading || marketsLoading
   const scanLabel = scanState === 'READY' ? 'READY TO SCAN' : scanState === 'COMPLETE' ? 'SCAN COMPLETE' : scanState
   const scanClass = scanState === 'ERROR' ? 'regime-off' : scanState === 'COMPLETE' ? 'regime-on' : 'regime-analyzing'
 
+  const ensureArcChain = async () => {
+    await switchChainAsync({ chainId: ARC_TESTNET_CHAIN_ID })
+  }
+
+  const refreshContractMarkets = async () => {
+    await refetchMarketCount()
+    await refetchMarkets()
+    if (positionReadContracts.length > 0) await refetchPositions()
+    if (payoutQuoteReadContracts.length > 0) await refetchPayoutQuotes()
+  }
+
+  const parseMarketCreatedId = (receiptLogs: Log[]) => {
+    const parsedLogs = parseEventLogs({
+      abi: PREDICTION_MARKET_ABI,
+      eventName: 'MarketCreated',
+      logs: receiptLogs,
+    })
+
+    const marketId = (parsedLogs[0] as { args?: { marketId?: bigint } } | undefined)?.args?.marketId
+    if (typeof marketId !== 'bigint') {
+      throw new Error('PredictionMarket did not emit MarketCreated.')
+    }
+
+    return marketId
+  }
+
+  const approveUsdcSpend = async (requiredAmount: bigint) => {
+    if (!address) throw new Error('Connect your wallet first.')
+    if (requiredAmount <= 0n) throw new Error('Enter a valid USDC amount.')
+    if (!publicClient) throw new Error('Public client unavailable.')
+
+    const hash = await approveWrite.writeContractAsync({
+      address: USDC_ADDRESS,
+      abi: ERC20_APPROVE_ABI,
+      functionName: 'approve',
+      args: [PREDICTION_MARKET_ADDRESS, requiredAmount],
+      chainId: ARC_TESTNET_CHAIN_ID,
+    })
+
+    await publicClient.waitForTransactionReceipt({ hash })
+    return hash
+  }
+
+  const createMarketOnChain = async (input: MarketInput) => {
+    const liquidity = parseUsdcAmount(input.initialLiquidity)
+    if (liquidity <= 0n) throw new Error(`Invalid initial liquidity for "${input.title}".`)
+
+    const deadline = parseDeadlineTimestamp(input.deadline)
+    if (deadline <= BigInt(currentUnixSeconds())) {
+      throw new Error('Choose a future deadline.')
+    }
+
+    if (!publicClient) throw new Error('Public client unavailable.')
+
+    await ensureArcChain()
+    await approveUsdcSpend(liquidity)
+
+    const hash = await writeContractAsync({
+      address: PREDICTION_MARKET_ADDRESS,
+      abi: PREDICTION_MARKET_ABI,
+      functionName: 'createMarket',
+      args: [
+        input.title,
+        input.description,
+        input.resolutionCriteria,
+        deadline,
+        liquidity,
+        BigInt(Math.round(input.aiProbability)),
+        input.category,
+        input.triggeredByNews,
+      ],
+      chainId: ARC_TESTNET_CHAIN_ID,
+    })
+
+    const receipt = await publicClient.waitForTransactionReceipt({ hash })
+    const marketId = parseMarketCreatedId(receipt.logs as Log[])
+    await refreshContractMarkets()
+    return { marketId, hash }
+  }
+
   const runMarketAgent = async () => {
-    if (!isConnected) return
+    if (!isConnected) {
+      setTxError('Connect a wallet before creating on-chain markets.')
+      return
+    }
 
     setLoading(true)
     setScanState('SCANNING')
-    setAgentLog(['Scanning current macro and geopolitical headlines...'])
+    setTxError(null)
+    setTxSuccess(null)
+    setAgentLog(['MarketAgent is requesting live market ideas.'])
 
     try {
       const response = await fetch('/api/market-agent', {
@@ -284,76 +514,251 @@ export default function MarketsPage() {
       }
 
       const data = await response.json()
-      const nextFeed = Array.isArray(data.news)
-        ? data.news.map((item: Record<string, unknown>, index: number) => normalizeNews(item, index)).slice(0, 5)
-        : []
-      const spawnedMarkets = Array.isArray(data.markets)
-        ? data.markets.map((item: Record<string, unknown>, index: number) => normalizeMarket(item, index))
+      const drafts = Array.isArray(data)
+        ? data.map(normalizeMarketDraft).filter((draft): draft is MarketDraft => draft !== null)
         : []
 
-      if (nextFeed.length > 0) setFeed(nextFeed)
-      if (spawnedMarkets.length > 0) setMarkets((current) => [...spawnedMarkets, ...current].slice(0, 8))
+      if (drafts.length === 0) {
+        throw new Error('MarketAgent did not return usable market drafts.')
+      }
 
+      setDrafts(drafts)
       setScanState('COMPLETE')
       setAgentLog([
-        data.fallback ? 'MarketAgent used fallback market drafts.' : `MarketAgent spawned ${spawnedMarkets.length} markets from live news.`,
-        `Monitoring ${nextFeed.length || feed.length} high-relevance macro and geopolitical headlines.`,
-        'Each new market includes AI probability, crowd odds, and disagreement scoring.',
+        `MarketAgent returned ${drafts.length} market drafts.`,
+        'Create each draft onchain one by one.',
       ])
-    } catch {
+    } catch (error) {
       setScanState('ERROR')
       setAgentLog([
-        'MarketAgent request failed.',
-        'Existing markets remain active and bet controls stay available.',
+        error instanceof Error ? error.message : 'MarketAgent request failed.',
+        'No market drafts were returned.',
       ])
     } finally {
       setLoading(false)
     }
   }
 
-  const handleBet = (marketId: string, side: MarketSide) => {
-    const market = markets.find((item) => item.id === marketId)
-    if (!market) return
+  const createDraftOnChain = async (draft: MarketDraft) => {
+    try {
+      setCreatingDraftId(draft.id)
+      setTxError(null)
+      setTxSuccess(null)
+      const created = await createMarketOnChain(buildMarketInput(draft))
 
-    setMarkets((current) => current.map((item) => {
-      if (item.id !== marketId) return item
-
-      const pool = parseLiquidity(item.initialLiquidity) + BET_SIZE_USDC
-      const crowdMove = side === 'YES' ? 1 : -1
-
-      return {
-        ...item,
-        initialLiquidity: formatPool(pool),
-        crowdOdds: clamp(item.crowdOdds + crowdMove, 5, 95),
-      }
-    }))
-
-    setAgentLog((current) => [
-      `Sent ${BET_SIZE_USDC} USDC to ${side} on "${market.title}".`,
-      ...current.slice(0, 3),
-    ])
+      setDrafts((current) => current.filter((item) => item.id !== draft.id))
+      setTxSuccess(`Market created on chain as #${created.marketId.toString()}.`)
+      setAgentLog((current) => [
+        `Created contract market #${created.marketId.toString()} from MarketAgent draft.`,
+        ...current.slice(0, 3),
+      ])
+    } catch (error) {
+      setTxError(error instanceof Error ? error.message : 'Failed to create market draft.')
+    } finally {
+      setCreatingDraftId(null)
+    }
   }
 
-  const handleManualCreate = () => {
-    if (!form.title.trim() || !form.description.trim() || !form.resolutionCriteria.trim() || !form.deadline.trim() || !form.initialLiquidity.trim()) return
+  const handleManualCreate = async () => {
+    if (!form.title.trim() || !form.description.trim() || !form.resolutionCriteria.trim() || !form.deadline.trim() || !form.initialLiquidity.trim() || !form.aiProbability.trim() || !form.category.trim() || !form.triggeredByNews.trim()) {
+      return
+    }
 
-    const manualMarket = normalizeMarket({
-      title: form.title,
-      description: form.description,
-      resolutionCriteria: form.resolutionCriteria,
-      deadline: form.deadline,
-      initialLiquidity: form.initialLiquidity,
-      aiProbability: 52,
-      category: 'Manual',
-      triggeredByNews: 'Manual creator input',
-    }, markets.length)
+    if (!isConnected || !address) {
+      setTxError('Connect a wallet before creating an on-chain market.')
+      return
+    }
 
-    setMarkets((current) => [manualMarket, ...current])
-    setForm(emptyForm)
-    setAgentLog((current) => [
-      `Manual market created with ${manualMarket.initialLiquidity} initial liquidity.`,
-      ...current.slice(0, 3),
-    ])
+    const aiProbability = parseAiProbability(form.aiProbability)
+    if (aiProbability === null) {
+      setTxError('Enter a valid AI probability.')
+      return
+    }
+
+    try {
+      setLoading(true)
+      setTxError(null)
+      setTxSuccess(null)
+
+      const created = await createMarketOnChain({
+        title: form.title,
+        description: form.description,
+        resolutionCriteria: form.resolutionCriteria,
+        deadline: form.deadline,
+        initialLiquidity: form.initialLiquidity,
+        aiProbability,
+        category: form.category,
+        triggeredByNews: form.triggeredByNews,
+      })
+
+      setForm(emptyForm)
+      setTxSuccess(`Market created on chain as #${created.marketId.toString()}.`)
+      setAgentLog((current) => [
+        `Created contract market #${created.marketId.toString()} from manual input.`,
+        ...current.slice(0, 3),
+      ])
+    } catch (error) {
+      setTxError(error instanceof Error ? error.message : 'Failed to create market.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const closeBetModal = () => {
+    if (transactionPending) return
+    setBetModal(null)
+    setTxError(null)
+    setTxSuccess(null)
+    setBetStep('idle')
+    setApprovalHash(null)
+    setBetHash(null)
+  }
+
+  const handleBet = (market: ContractMarket, side: MarketSide) => {
+    setTxError(null)
+    setTxSuccess(null)
+    setBetStep('idle')
+    setApprovalHash(null)
+    setBetHash(null)
+    setBetModal({
+      market,
+      side,
+      amount: '',
+    })
+  }
+
+  const submitBet = async () => {
+    if (!betModal || !selectedBetMarket || !address) return
+
+    const amount = betAmountUnits
+    if (amount <= 0n) {
+      setTxError('Enter a valid USDC amount.')
+      return
+    }
+
+    try {
+      setLoading(true)
+      setTxError(null)
+      setTxSuccess(null)
+      setBetStep('approving')
+      setApprovalHash(null)
+      setBetHash(null)
+
+      await ensureArcChain()
+      const approvalTx = await approveUsdcSpend(amount)
+      setApprovalHash(approvalTx)
+
+      setBetStep('betting')
+      const hash = await writeContractAsync({
+        address: PREDICTION_MARKET_ADDRESS,
+        abi: PREDICTION_MARKET_ABI,
+        functionName: betModal.side === 'YES' ? 'betYes' : 'betNo',
+        args: [selectedBetMarket.id, amount],
+        chainId: ARC_TESTNET_CHAIN_ID,
+      })
+
+      if (!publicClient) {
+        throw new Error('Public client unavailable.')
+      }
+
+      await publicClient.waitForTransactionReceipt({ hash })
+      await refreshContractMarkets()
+
+      setBetHash(hash)
+      setBetStep('confirmed')
+      setTxSuccess(`Bet confirmed. Transaction: ${hash}`)
+      setAgentLog((current) => [
+        `Confirmed ${betModal.side} bet on contract market #${selectedBetMarket.marketId}.`,
+        ...current.slice(0, 3),
+      ])
+    } catch (error) {
+      setTxError(error instanceof Error ? error.message : 'Failed to submit bet.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const resolveMarketOnChain = async (market: ContractMarket, yesWon: boolean) => {
+    if (!address) {
+      setTxError('Connect your wallet before resolving a market.')
+      return
+    }
+
+    if (market.creator.toLowerCase() !== address.toLowerCase()) {
+      setTxError('Only the market creator can resolve this market.')
+      return
+    }
+
+    if (!publicClient) {
+      setTxError('Public client unavailable.')
+      return
+    }
+
+    try {
+      setLoading(true)
+      setTxError(null)
+      setTxSuccess(null)
+      await ensureArcChain()
+
+      const hash = await writeContractAsync({
+        address: PREDICTION_MARKET_ADDRESS,
+        abi: PREDICTION_MARKET_ABI,
+        functionName: 'resolveMarket',
+        args: [market.id, yesWon],
+        chainId: ARC_TESTNET_CHAIN_ID,
+      })
+
+      await publicClient.waitForTransactionReceipt({ hash })
+      await refreshContractMarkets()
+      setTxSuccess(`Market #${market.marketId} resolved ${yesWon ? 'YES' : 'NO'}. Transaction: ${hash}`)
+      setAgentLog((current) => [
+        `Resolved contract market #${market.marketId} as ${yesWon ? 'YES' : 'NO'}.`,
+        ...current.slice(0, 3),
+      ])
+    } catch (error) {
+      setTxError(error instanceof Error ? error.message : 'Failed to resolve market.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const claimPayoutOnChain = async (market: ContractMarket) => {
+    if (!address) {
+      setTxError('Connect your wallet before claiming payout.')
+      return
+    }
+
+    if (!publicClient) {
+      setTxError('Public client unavailable.')
+      return
+    }
+
+    try {
+      setLoading(true)
+      setTxError(null)
+      setTxSuccess(null)
+      await ensureArcChain()
+
+      const hash = await writeContractAsync({
+        address: PREDICTION_MARKET_ADDRESS,
+        abi: PREDICTION_MARKET_ABI,
+        functionName: 'claimPayout',
+        args: [market.id],
+        chainId: ARC_TESTNET_CHAIN_ID,
+      })
+
+      await publicClient.waitForTransactionReceipt({ hash })
+      await refreshContractMarkets()
+      setTxSuccess(`Payout claimed for market #${market.marketId}. Transaction: ${hash}`)
+      setAgentLog((current) => [
+        `Claimed payout from contract market #${market.marketId}.`,
+        ...current.slice(0, 3),
+      ])
+    } catch (error) {
+      setTxError(error instanceof Error ? error.message : 'Failed to claim payout.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -370,56 +775,29 @@ export default function MarketsPage() {
         <div className="page-heading page-anim page-anim-2">
           <div className="page-tag">RFB 3 · MarketAgent</div>
           <h1 className="page-title">MarketAgent Dashboard</h1>
-          <p className="page-sub">AI scans macro and geopolitical news, spawns USDC markets on Arc testnet, and flags alpha when model probability diverges from the crowd.</p>
+          <p className="page-sub">Markets, pools, crowd odds, deadlines, and bet execution are read from the deployed PredictionMarket contract.</p>
         </div>
 
         {!isConnected ? (
           <div className="card connect-prompt page-anim page-anim-3">
             <h3>Connect your wallet to continue</h3>
-            <p>MarketAgent needs your wallet before it can spawn markets or send USDC bets.</p>
+            <p>MarketAgent needs your wallet before it can create markets or send USDC bets.</p>
           </div>
         ) : (
           <>
             <section className="market-section page-anim page-anim-3">
               <div className="market-section-header">
                 <div>
-                  <div className="card-title">Live News Feed</div>
-                  <h2 className="feature-title">Five macro and geopolitical signals under AI watch.</h2>
-                </div>
-                <div className={`regime-badge ${scanClass}`}>
-                  <span className="regime-dot"></span>
-                  {scanLabel}
-                </div>
-              </div>
-
-              <div className="news-feed-grid">
-                {feed.slice(0, 5).map((item) => (
-                  <article className="news-signal-card" key={`${item.headline}-${item.timestamp}`}>
-                    <div className="news-signal-top">
-                      <div className="market-kicker">{item.source} · {item.timestamp}</div>
-                      <span>{item.relevanceScore}</span>
-                    </div>
-                    <h3>{item.headline}</h3>
-                    <p>{item.summary}</p>
-                    <progress className="usyc-progress" value={item.relevanceScore} max={100} aria-label={`${item.headline} relevance score`} />
-                  </article>
-                ))}
-              </div>
-            </section>
-
-            <section className="market-section page-anim page-anim-4">
-              <div className="market-section-header">
-                <div>
-                  <div className="card-title">Active Markets</div>
+                  <div className="card-title">Contract Markets</div>
                   <h2 className="feature-title">AI probability versus crowd implied odds.</h2>
                 </div>
-                <div className="market-summary-strip" aria-label="Active market summary">
+                <div className="market-summary-strip" aria-label="Contract market summary">
                   <div>
                     <span>{markets.length}</span>
-                    <small>active</small>
+                    <small>markets</small>
                   </div>
                   <div>
-                    <span>{formatPool(totalPool)}</span>
+                    <span>{formatUsdcAmount(totalPool)}</span>
                     <small>pool</small>
                   </div>
                   <div>
@@ -429,68 +807,144 @@ export default function MarketsPage() {
                 </div>
               </div>
 
-              <div className="active-market-grid">
-                {markets.map((market) => {
-                  const disagreement = getDisagreement(market)
-                  const highAlpha = disagreement > 15
+              {isReadingMarkets ? (
+                <div className="empty-market-state">
+                  <p>Loading contract markets...</p>
+                </div>
+              ) : markets.length === 0 ? (
+                <div className="empty-market-state">
+                  <p>No markets yet. Run MarketAgent to create the first market.</p>
+                </div>
+              ) : (
+                <div className="active-market-grid">
+                  {markets.map((market) => {
+                    const crowdOdds = getCrowdOdds(market)
+                    const disagreement = crowdOdds === null ? null : Math.abs(market.aiProbability - crowdOdds)
+                    const highAlpha = disagreement !== null && disagreement > 15
+                    const userPosition = userPositions.get(market.marketId)
+                    const hasUserPosition = !!userPosition && (userPosition.yesAmount > 0n || userPosition.noAmount > 0n)
+                    const isCreator = !!address && market.creator.toLowerCase() === address.toLowerCase()
+                    const isClosed = market.deadline > 0n && market.deadline <= BigInt(nowSeconds)
+                    const canClaim = !!userPosition && market.resolved && !userPosition.claimed && userPosition.payout > 0n
 
-                  return (
-                    <article className="active-market-card" key={market.id}>
-                      <div className="active-market-top">
-                        <span className="category-badge">{market.category}</span>
-                        {highAlpha ? <span className="alpha-badge">HIGH ALPHA</span> : <span className="spawn-badge">{market.spawnedAt}</span>}
-                      </div>
-
-                      <h3>{market.title}</h3>
-                      <p>{market.description}</p>
-
-                      <div className="market-trigger">
-                        <Newspaper size={14} aria-hidden="true" />
-                        <span>{market.triggeredByNews}</span>
-                      </div>
-
-                      <div className="market-card-meta">
-                        <div>
-                          <span>Deadline</span>
-                          <strong>{getDeadlineCountdown(market.deadline)}</strong>
+                    return (
+                      <article className="active-market-card" key={market.marketId}>
+                        <div className="active-market-top">
+                          <span className="category-badge">{market.category || `Contract #${market.marketId}`}</span>
+                          {market.resolved ? <span className="spawn-badge">RESOLVED</span> : null}
+                          {!market.resolved && isClosed ? <span className="spawn-badge">CLOSED</span> : null}
+                          {highAlpha ? <span className="alpha-badge">HIGH ALPHA</span> : null}
                         </div>
-                        <div>
-                          <span>USDC pool</span>
-                          <strong>{market.initialLiquidity}</strong>
-                        </div>
-                      </div>
 
-                      <div className="probability-grid">
-                        <div>
-                          <span>AI</span>
-                          <strong>{market.aiProbability}%</strong>
-                        </div>
-                        <div>
-                          <span>Crowd</span>
-                          <strong>{market.crowdOdds}%</strong>
-                        </div>
-                        <div className={highAlpha ? 'disagreement-hot' : undefined}>
-                          <span>Disagree</span>
-                          <strong>{disagreement}%</strong>
-                        </div>
-                      </div>
+                        <h3>{market.title}</h3>
+                        <p>{market.description}</p>
 
-                      <div className="market-resolution">{market.resolutionCriteria}</div>
+                        <div className="market-card-meta">
+                          <div>
+                            <span>Deadline</span>
+                            <strong>{formatDeadline(market.deadline)}</strong>
+                          </div>
+                          <div>
+                            <span>Pool</span>
+                            <strong>{formatUsdcAmount(market.pool)}</strong>
+                          </div>
+                        </div>
 
-                      <div className="bet-actions">
-                        <button className="bet-btn bet-yes" onClick={() => handleBet(market.id, 'YES')}>
-                          <CircleDollarSign size={15} aria-hidden="true" />
-                          Bet YES
-                        </button>
-                        <button className="bet-btn bet-no" onClick={() => handleBet(market.id, 'NO')}>
-                          <CircleDollarSign size={15} aria-hidden="true" />
-                          Bet NO
-                        </button>
-                      </div>
-                    </article>
-                  )
-                })}
-              </div>
+                        <div className="market-card-meta">
+                          <div>
+                            <span>YES bets</span>
+                            <strong>{formatUsdcAmount(market.totalYes)}</strong>
+                          </div>
+                          <div>
+                            <span>NO bets</span>
+                            <strong>{formatUsdcAmount(market.totalNo)}</strong>
+                          </div>
+                        </div>
+
+                        {hasUserPosition ? (
+                          <div className="market-card-meta">
+                            <div>
+                              <span>Your YES</span>
+                              <strong>{formatUsdcAmount(userPosition.yesAmount)}</strong>
+                            </div>
+                            <div>
+                              <span>Your NO</span>
+                              <strong>{formatUsdcAmount(userPosition.noAmount)}</strong>
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {canClaim ? (
+                          <div className="market-card-meta">
+                            <div>
+                              <span>Claimable</span>
+                              <strong>{formatUsdcAmount(userPosition.payout)}</strong>
+                            </div>
+                            <div>
+                              <span>Outcome</span>
+                              <strong>{market.outcome === 1 ? 'YES' : 'NO'}</strong>
+                            </div>
+                          </div>
+                        ) : null}
+
+                        <div className="probability-grid">
+                          <div>
+                            <span>AI</span>
+                            <strong>{formatPercent(market.aiProbability)}</strong>
+                          </div>
+                          <div>
+                            <span>Crowd</span>
+                            <div className="odds-line">
+                              <strong>{crowdOdds === null ? 'No bets yet' : formatPercent(crowdOdds)}</strong>
+                              {disagreement !== null && crowdOdds !== null ? (
+                                <span className="edge-badge">
+                                  {market.aiProbability >= crowdOdds ? '+' : '-'}{formatPercent(disagreement)} edge
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="market-criteria">{market.resolutionCriteria}</div>
+                        <div className="market-criteria">{market.triggeredByNews}</div>
+
+                        <div className="bet-actions">
+                          <button className="bet-btn bet-yes" onClick={() => handleBet(market, 'YES')} disabled={market.resolved || isClosed || transactionPending}>
+                            <CircleDollarSign size={15} aria-hidden="true" />
+                            Bet YES
+                          </button>
+                          <button className="bet-btn bet-no" onClick={() => handleBet(market, 'NO')} disabled={market.resolved || isClosed || transactionPending}>
+                            <CircleDollarSign size={15} aria-hidden="true" />
+                            Bet NO
+                          </button>
+                        </div>
+
+                        {isCreator && !market.resolved ? (
+                          <div className="bet-actions">
+                            <button className="simulate-btn" type="button" onClick={() => void resolveMarketOnChain(market, true)} disabled={transactionPending}>
+                              <CheckCircle2 size={13} aria-hidden="true" />
+                              Resolve YES
+                            </button>
+                            <button className="simulate-btn" type="button" onClick={() => void resolveMarketOnChain(market, false)} disabled={transactionPending}>
+                              <CheckCircle2 size={13} aria-hidden="true" />
+                              Resolve NO
+                            </button>
+                          </div>
+                        ) : null}
+
+                        {canClaim ? (
+                          <div className="bet-actions">
+                            <button className="simulate-btn" type="button" onClick={() => void claimPayoutOnChain(market)} disabled={transactionPending}>
+                              <CircleDollarSign size={13} aria-hidden="true" />
+                              Claim payout
+                            </button>
+                          </div>
+                        ) : null}
+                      </article>
+                    )
+                  })}
+                </div>
+              )}
             </section>
 
             <div className="dashboard-grid market-command-grid page-anim page-anim-5">
@@ -503,11 +957,11 @@ export default function MarketsPage() {
                 <div className="market-agent-stats">
                   <div>
                     <Activity size={16} aria-hidden="true" />
-                    <span>{feed.length} live signals</span>
+                    <span>{markets.length} contract markets</span>
                   </div>
                   <div>
                     <Send size={16} aria-hidden="true" />
-                    <span>{markets.length} USDC markets</span>
+                    <span>{formatUsdcAmount(totalPool)} pool</span>
                   </div>
                 </div>
                 <div className="log-box dashboard-log">
@@ -517,24 +971,63 @@ export default function MarketsPage() {
                 </div>
                 <button className="run-btn" onClick={runMarketAgent} disabled={loading}>
                   <RefreshCw size={16} aria-hidden="true" />
-                  {loading ? 'Scanning markets...' : 'Run MarketAgent'}
+                  {loading ? 'Running MarketAgent...' : 'Run MarketAgent'}
                 </button>
               </section>
 
+              <section className="card">
+                <div className="card-title">MarketAgent Drafts</div>
+                {drafts.length === 0 ? (
+                  <div className="empty-market-state">
+                    <p>Run MarketAgent to load AI-generated market ideas.</p>
+                  </div>
+                ) : (
+                  <div className="market-list">
+                    {drafts.map((draft) => {
+                      const isCreating = creatingDraftId === draft.id
+                      return (
+                        <div className="market-row bet-opportunity-row" key={draft.id}>
+                          <div>
+                            <div className="market-kicker">
+                              {draft.category}
+                              <span className="decay-timer">{formatPercent(draft.aiProbability)} AI</span>
+                            </div>
+                            <div className="market-title">{draft.title}</div>
+                            <div className="market-criteria">{draft.description}</div>
+                            <div className="market-criteria">{draft.resolutionCriteria}</div>
+                            <div className="market-criteria">{draft.triggeredByNews}</div>
+                          </div>
+                          <div className="market-score">
+                            <span>{draft.deadline}</span>
+                            <small>{draft.initialLiquidity}</small>
+                            <button className="simulate-btn" type="button" onClick={() => void createDraftOnChain(draft)} disabled={isCreating}>
+                              <CheckCircle2 size={13} aria-hidden="true" />
+                              {isCreating ? 'Creating...' : 'Create onchain'}
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </section>
+            </div>
+
+            <div className="dashboard-grid market-command-grid page-anim page-anim-5">
               <section className="card">
                 <div className="card-title">Manual Create Market</div>
                 <div className="market-form">
                   <label>
                     <span>Title</span>
-                    <input value={form.title} onChange={(e) => setForm((current) => ({ ...current, title: e.target.value }))} placeholder="Will the Fed cut rates in June?" />
+                    <input value={form.title} onChange={(e) => setForm((current) => ({ ...current, title: e.target.value }))} placeholder="Market title" />
                   </label>
                   <label>
                     <span>Description</span>
-                    <textarea value={form.description} onChange={(e) => setForm((current) => ({ ...current, description: e.target.value }))} placeholder="Short summary of the event and why it matters." rows={3} />
+                    <textarea value={form.description} onChange={(e) => setForm((current) => ({ ...current, description: e.target.value }))} placeholder="Describe the market." rows={3} />
                   </label>
                   <label>
                     <span>Resolution Criteria</span>
-                    <textarea value={form.resolutionCriteria} onChange={(e) => setForm((current) => ({ ...current, resolutionCriteria: e.target.value }))} placeholder="Define exactly how this market settles." rows={3} />
+                    <textarea value={form.resolutionCriteria} onChange={(e) => setForm((current) => ({ ...current, resolutionCriteria: e.target.value }))} placeholder="Define how it settles." rows={3} />
                   </label>
                   <div className="market-form-grid">
                     <label>
@@ -543,48 +1036,99 @@ export default function MarketsPage() {
                     </label>
                     <label>
                       <span>Initial Liquidity</span>
-                      <input value={form.initialLiquidity} onChange={(e) => setForm((current) => ({ ...current, initialLiquidity: e.target.value }))} placeholder="$2,500 USDC" />
+                      <input value={form.initialLiquidity} onChange={(e) => setForm((current) => ({ ...current, initialLiquidity: e.target.value }))} placeholder="USDC amount" inputMode="decimal" />
                     </label>
                   </div>
-                  <button className="run-btn" onClick={handleManualCreate}>
+                  <div className="market-form-grid">
+                    <label>
+                      <span>AI Probability</span>
+                      <input value={form.aiProbability} onChange={(e) => setForm((current) => ({ ...current, aiProbability: e.target.value }))} placeholder="0-100" inputMode="decimal" />
+                    </label>
+                    <label>
+                      <span>Category</span>
+                      <input value={form.category} onChange={(e) => setForm((current) => ({ ...current, category: e.target.value }))} placeholder="Macro, Rates, Energy..." />
+                    </label>
+                  </div>
+                  <label>
+                    <span>Triggered By News</span>
+                    <textarea value={form.triggeredByNews} onChange={(e) => setForm((current) => ({ ...current, triggeredByNews: e.target.value }))} placeholder="Headline or event that spawned this market." rows={2} />
+                  </label>
+                  <button className="run-btn" onClick={handleManualCreate} disabled={loading}>
                     <Plus size={16} aria-hidden="true" />
                     Create Market
                   </button>
                 </div>
+                {txError ? <div className="modal-status error">{txError}</div> : null}
+                {txSuccess ? <div className="modal-status success">{txSuccess}</div> : null}
               </section>
             </div>
-
-            <section className="card page-anim page-anim-5">
-              <div className="card-title">Resolved Markets History</div>
-              <table className="portfolio-table">
-                <thead>
-                  <tr>
-                    <th>Market</th>
-                    <th>Resolved</th>
-                    <th>Outcome</th>
-                    <th>Pool</th>
-                    <th>Signal</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {resolvedMarkets.map((market) => (
-                    <tr key={`${market.title}-${market.resolved}`}>
-                      <td className="portfolio-asset-cell">
-                        {market.title}
-                        <div className="market-criteria">{market.category}</div>
-                      </td>
-                      <td className="portfolio-amount-cell">{market.resolved}</td>
-                      <td className="portfolio-value-cell">{market.outcome}</td>
-                      <td className="portfolio-amount-cell">{market.pool}</td>
-                      <td className="portfolio-amount-cell">{market.accuracy}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
           </>
         )}
       </div>
+
+      {betModal && selectedBetMarket ? (
+        <div className="modal-backdrop" role="presentation" onClick={closeBetModal}>
+          <div className="modal-shell" role="dialog" aria-modal="true" aria-label="Bet market dialog" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-top">
+              <div>
+                <div className="card-title">{betModal.side} bet</div>
+                <h3>{selectedBetMarket.title}</h3>
+              </div>
+              <button type="button" className="modal-close" onClick={closeBetModal} disabled={transactionPending}>Close</button>
+            </div>
+            <div className="modal-meta">
+              <div><span>Market</span><strong>#{selectedBetMarket.marketId}</strong></div>
+              <div><span>Current odds</span><strong>{selectedBetImpliedOdds === null ? 'No bets yet' : formatPercent(selectedBetImpliedOdds)}</strong></div>
+              <div><span>Decimal odds</span><strong>{selectedDecimalOdds === null ? 'n/a' : `${selectedDecimalOdds.toFixed(2)}x`}</strong></div>
+              <div><span>Pool</span><strong>{formatUsdcAmount(selectedBetMarket.pool)}</strong></div>
+            </div>
+            <label className="market-form">
+              <span>USDC amount</span>
+              <input
+                value={betModal.amount}
+                onChange={(event) => setBetModal((current) => current ? { ...current, amount: event.target.value } : current)}
+                placeholder="0.00"
+                inputMode="decimal"
+              />
+            </label>
+            <div className="modal-payout">
+              <span>Expected payout if win</span>
+              <strong>{formatUsdcAmount(quotePotentialPayout(selectedBetMarket, betModal.side, betAmountUnits))}</strong>
+            </div>
+            <div className="modal-steps">
+              <span className={betStep === 'approving' ? 'active' : approvalHash ? 'done' : undefined}>Approve USDC</span>
+              <span className={betStep === 'betting' ? 'active' : betHash ? 'done' : undefined}>Submit {betModal.side}</span>
+              <span className={betStep === 'confirmed' ? 'done' : undefined}>Confirmed</span>
+            </div>
+            {approvalHash ? (
+              <div className="modal-hash">
+                <span>Approval tx</span>
+                <strong>{approvalHash}</strong>
+              </div>
+            ) : null}
+            {betHash ? (
+              <div className="modal-hash">
+                <span>Bet tx</span>
+                <strong>{betHash}</strong>
+              </div>
+            ) : null}
+            {txError ? <div className="modal-status error">{txError}</div> : null}
+            {txSuccess ? <div className="modal-status success">{txSuccess}</div> : null}
+            <button type="button" className="run-btn" onClick={submitBet} disabled={transactionPending || betStep === 'confirmed'}>
+              {betStep === 'approving'
+                ? 'Approving USDC...'
+                : betStep === 'betting'
+                  ? 'Submitting bet...'
+                  : betStep === 'confirmed'
+                    ? 'Bet Confirmed'
+                    : 'Approve and Confirm Bet'}
+            </button>
+            <div className="modal-footnote">
+              {`USDC approval lets ${PREDICTION_MARKET_ADDRESS} spend ${formatUsdcAmount(betAmountUnits)} before the ${betModal.side} bet is submitted.`}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   )
 }

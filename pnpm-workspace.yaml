@@ -1,4 +1,6 @@
 allowBuilds:
+  esbuild: set this to true or false
+  keccak: set this to true or false
   msw: true
   sharp: true
   unrs-resolver: true

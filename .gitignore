@@ -7,3 +7,7 @@ node_modules/
 .vercel
 .codex-runtime-home/
 tsconfig.tsbuildinfo
+cache/
+artifacts/build-info/
+artifacts/**/*.dbg.json
+artifacts/contracts/PredictionMarket.sol/IERC20.json
