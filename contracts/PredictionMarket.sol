@@ -8,6 +8,7 @@ interface IERC20 {
 
 contract PredictionMarket {
     IERC20 public constant USDC = IERC20(0x3600000000000000000000000000000000000000);
+    address public immutable aiResolver;
 
     enum Outcome {
         Unresolved,
@@ -71,13 +72,21 @@ contract PredictionMarket {
     error InvalidProbability();
     error MarketResolvedAlready();
     error MarketNotResolved();
+    error MarketNotClosed();
     error NotMarketCreator();
+    error NotAiResolver();
+    error InvalidAiResolver();
     error MarketNotOpen();
     error AlreadyClaimed();
     error NoOpenPosition();
     error NoWinningPosition();
     error NoWinners();
     error TransferFailed();
+
+    constructor(address _aiResolver) {
+        if (_aiResolver == address(0)) revert InvalidAiResolver();
+        aiResolver = _aiResolver;
+    }
 
     function createMarket(
         string calldata title,
@@ -140,7 +149,8 @@ contract PredictionMarket {
     function resolveMarket(uint256 marketId, bool yesWon) external {
         Market storage market = _getMarket(marketId);
         if (market.resolved) revert MarketResolvedAlready();
-        if (msg.sender != market.creator) revert NotMarketCreator();
+        if (msg.sender != aiResolver) revert NotAiResolver();
+        if (market.deadline > block.timestamp) revert MarketNotClosed();
 
         market.resolved = true;
         market.outcome = yesWon ? Outcome.Yes : Outcome.No;

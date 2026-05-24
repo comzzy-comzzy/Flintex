@@ -14,6 +14,7 @@ Flintex is now wired to a deployed Arc testnet prediction market contract. The a
 - Create binary prediction markets onchain with USDC seed liquidity.
 - Place YES or NO bets with an approve-then-bet wallet flow.
 - Unstake open, unresolved bet positions back to the wallet before the market deadline.
+- Resolve closed markets through ResolverAgent, which signs from the authorized AI resolver wallet instead of the market creator wallet.
 - Read markets, pools, odds, deadlines, and positions from the contract.
 - Show BetAgent opportunities using AI probability, real crowd odds, Kelly sizing, and high-alpha flags.
 - Show a compact My Bets section with Open, Closed, Won, Lost, and Claimed states.
@@ -33,6 +34,7 @@ The frontend reads the PredictionMarket ABI from `artifacts/contracts/Prediction
 - `POST /api/portfolio-agent` analyzes a supplied portfolio and returns regime, USYC allocation, and reasoning.
 - `POST /api/market-agent` calls FreeModel at `https://cc.freemodel.dev/v1/messages` using model `claude-haiku-4-5-20251001` and returns market drafts.
 - `POST /api/bet-agent` accepts open markets, estimates true probabilities, compares them with crowd odds, calculates Kelly sizing, and returns opportunities.
+- `POST /api/resolve-agent` resolves one closed market by marketId. `GET /api/resolve-agent` scans all closed unresolved markets for scheduled AI settlement.
 
 ## Stack
 
@@ -50,6 +52,8 @@ Create `.env.local` from `.env.example` and fill only local or deployment secret
 ```bash
 RPC_URL=
 DEPLOYER_PRIVATE_KEY=
+AI_RESOLVER_PRIVATE_KEY=
+AI_RESOLVER_ADDRESS=
 FREEMODEL_API_KEY=
 NEXT_PUBLIC_PREDICTION_MARKET_ADDRESS=
 NEXT_PUBLIC_CIRCLE_KIT_KEY=

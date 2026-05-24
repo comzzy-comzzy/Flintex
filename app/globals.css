@@ -299,19 +299,10 @@ body {
 .modal-status.success { color: #bbf7d0; background: #0d2818; border: 1px solid #166534; }
 .modal-status.warning { color: #fde68a; background: #2b2108; border: 1px solid #854d0e; }
 .modal-footnote { color: #475569; font-family: 'Geist Mono', monospace; font-size: 10px; line-height: 1.5; margin-top: 12px; overflow-wrap: anywhere; }
-.resolution-modal-shell { width: min(100%, 560px); }
 .resolution-lock, .resolution-review-note { display: grid; gap: 5px; padding: 9px 10px; background: #060a0f; border: 1px solid #0f1e2e; border-radius: 8px; }
-.resolution-lock span, .resolution-review-note span, .resolution-recommendation span, .resolution-evidence span { color: #475569; font-family: 'Geist Mono', monospace; font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; }
+.resolution-lock span, .resolution-review-note span { color: #475569; font-family: 'Geist Mono', monospace; font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; }
 .resolution-lock strong, .resolution-review-note strong { color: #94a3b8; font-family: 'Geist Mono', monospace; font-size: 10px; line-height: 1.35; font-weight: 500; }
 .resolution-review-note strong { color: #67e8f9; }
-.resolution-recommendation { display: grid; gap: 8px; margin-top: 12px; padding: 12px; border-radius: 8px; }
-.resolution-recommendation.aligned { background: #0d2818; border: 1px solid #166534; }
-.resolution-recommendation.conflict { background: #2d1010; border: 1px solid #7f1d1d; }
-.resolution-recommendation strong { display: block; margin-top: 5px; color: #f0f9ff; font-family: 'Geist Mono', monospace; font-size: 13px; line-height: 1.35; }
-.resolution-recommendation p { color: #94a3b8; font-size: 12.5px; line-height: 1.5; }
-.resolution-evidence { display: grid; gap: 8px; margin-top: 12px; }
-.resolution-evidence div { background: #060a0f; border: 1px solid #0f1e2e; border-radius: 8px; padding: 10px; }
-.resolution-evidence p { color: #94a3b8; font-size: 12.5px; line-height: 1.5; margin-top: 6px; }
 .market-command-grid { grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); }
 .market-agent-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 16px 0; }
 .market-agent-stats div { display: flex; align-items: center; gap: 8px; background: #060a0f; border: 1px solid #0f1e2e; border-radius: 8px; padding: 11px 12px; color: #94a3b8; font-family: 'Geist Mono', monospace; font-size: 11px; }

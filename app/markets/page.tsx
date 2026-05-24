@@ -70,11 +70,6 @@ type BetModalState = {
   amount: string
 }
 
-type ResolveModalState = {
-  market: ContractMarket
-  outcome: MarketSide
-}
-
 type UserPosition = {
   yesAmount: bigint
   noAmount: bigint
@@ -270,40 +265,6 @@ const getBetDecimalOdds = (market: ContractMarket, side: MarketSide) => {
   return 100 / impliedProbability
 }
 
-const getResolutionRecommendation = (market: ContractMarket) => {
-  const crowdOdds = getCrowdOdds(market)
-  const aiSide: MarketSide = market.aiProbability >= 50 ? 'YES' : 'NO'
-  const aiConfidence = aiSide === 'YES' ? market.aiProbability : 100 - market.aiProbability
-
-  if (crowdOdds === null) {
-    return {
-      side: aiSide,
-      confidence: aiConfidence,
-      source: 'AI prior',
-      summary: `MarketAgent prior leans ${aiSide} at ${formatPercent(aiConfidence)} confidence. No crowd split is available yet.`,
-    }
-  }
-
-  const crowdSide: MarketSide = crowdOdds >= 50 ? 'YES' : 'NO'
-  const crowdConfidence = crowdSide === 'YES' ? crowdOdds : 100 - crowdOdds
-
-  if (aiSide === crowdSide) {
-    return {
-      side: aiSide,
-      confidence: round((aiConfidence + crowdConfidence) / 2, 1),
-      source: 'AI + crowd',
-      summary: `MarketAgent prior and final crowd split both lean ${aiSide}.`,
-    }
-  }
-
-  return {
-    side: aiSide,
-    confidence: aiConfidence,
-    source: 'AI prior',
-    summary: `MarketAgent prior leans ${aiSide}, while final crowd split leans ${crowdSide}. Review sources before signing.`,
-  }
-}
-
 const quotePotentialPayout = (market: ContractMarket, side: MarketSide, amount: bigint) => {
   if (amount <= 0n) return 0n
 
@@ -340,7 +301,7 @@ export default function MarketsPage() {
   const [drafts, setDrafts] = useState<MarketDraft[]>([])
   const [creatingDraftId, setCreatingDraftId] = useState<string | null>(null)
   const [betModal, setBetModal] = useState<BetModalState | null>(null)
-  const [resolveModal, setResolveModal] = useState<ResolveModalState | null>(null)
+  const [resolvingMarketId, setResolvingMarketId] = useState<string | null>(null)
   const [txError, setTxError] = useState<string | null>(null)
   const [txSuccess, setTxSuccess] = useState<string | null>(null)
   const [betStep, setBetStep] = useState<BetStep>('idle')
@@ -484,12 +445,6 @@ export default function MarketsPage() {
     ? betModal.side === 'YES' ? selectedCrowdOdds : 100 - selectedCrowdOdds
     : null
   const selectedDecimalOdds = selectedBetMarket && betModal ? getBetDecimalOdds(selectedBetMarket, betModal.side) : null
-  const selectedResolveMarket = useMemo(() => {
-    if (!resolveModal) return null
-    return markets.find((market) => market.marketId === resolveModal.market.marketId) ?? resolveModal.market
-  }, [markets, resolveModal])
-  const resolutionRecommendation = selectedResolveMarket ? getResolutionRecommendation(selectedResolveMarket) : null
-  const selectedResolveCrowdOdds = selectedResolveMarket ? getCrowdOdds(selectedResolveMarket) : null
   const transactionPending = loading || isPending || approveWrite.isPending
   const canSubmitBet = !transactionPending && betStep !== 'confirmed' && walletUsdcBalanceReady && !betExceedsBalance && betAmountUnits > 0n
   const isReadingMarkets = marketCountLoading || marketsLoading
@@ -701,13 +656,6 @@ export default function MarketsPage() {
     setBetHash(null)
   }
 
-  const closeResolveModal = () => {
-    if (transactionPending) return
-    setResolveModal(null)
-    setTxError(null)
-    setTxSuccess(null)
-  }
-
   const handleBet = (market: ContractMarket, side: MarketSide) => {
     setTxError(null)
     setTxSuccess(null)
@@ -719,12 +667,6 @@ export default function MarketsPage() {
       side,
       amount: '',
     })
-  }
-
-  const openResolveModal = (market: ContractMarket, outcome: MarketSide) => {
-    setTxError(null)
-    setTxSuccess(null)
-    setResolveModal({ market, outcome })
   }
 
   const submitBet = async () => {
@@ -788,53 +730,39 @@ export default function MarketsPage() {
     }
   }
 
-  const resolveMarketOnChain = async (market: ContractMarket, yesWon: boolean) => {
-    if (!address) {
-      setTxError('Connect your wallet before resolving a market.')
-      return
-    }
-
-    if (market.creator.toLowerCase() !== address.toLowerCase()) {
-      setTxError('Only the market creator can resolve this market.')
-      return
-    }
-
+  const requestAiResolution = async (market: ContractMarket) => {
     if (market.deadline > 0n && market.deadline > BigInt(currentUnixSeconds())) {
-      setTxError(`Resolution unlocks after ${formatDeadlineDateTime(market.deadline)}.`)
-      return
-    }
-
-    if (!publicClient) {
-      setTxError('Public client unavailable.')
+      setTxError(`AI resolution unlocks after ${formatDeadlineDateTime(market.deadline)}.`)
       return
     }
 
     try {
-      setLoading(true)
+      setResolvingMarketId(market.marketId)
       setTxError(null)
       setTxSuccess(null)
-      await ensureArcChain()
 
-      const hash = await writeContractAsync({
-        address: PREDICTION_MARKET_ADDRESS,
-        abi: PREDICTION_MARKET_ABI,
-        functionName: 'resolveMarket',
-        args: [market.id, yesWon],
-        chainId: ARC_TESTNET_CHAIN_ID,
+      const response = await fetch('/api/resolve-agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ marketId: market.marketId }),
       })
+      const data = await response.json()
 
-      await publicClient.waitForTransactionReceipt({ hash })
+      if (!response.ok) {
+        throw new Error(typeof data.error === 'string' ? data.error : 'AI Resolver could not resolve this market.')
+      }
+
       await refreshContractMarkets()
-      setResolveModal(null)
-      setTxSuccess(`Market #${market.marketId} resolved ${yesWon ? 'YES' : 'NO'}. Transaction: ${hash}`)
+      setTxSuccess(`AI resolved market #${market.marketId} as ${data.outcome}. Transaction: ${data.txHash}`)
       setAgentLog((current) => [
-        `Resolved contract market #${market.marketId} as ${yesWon ? 'YES' : 'NO'}.`,
+        `AI Resolver settled contract market #${market.marketId} as ${data.outcome}.`,
+        typeof data.reasoning === 'string' ? data.reasoning : 'Resolution submitted by the authorized AI resolver wallet.',
         ...current.slice(0, 3),
       ])
     } catch (error) {
-      setTxError(error instanceof Error ? error.message : 'Failed to resolve market.')
+      setTxError(error instanceof Error ? error.message : 'AI Resolver failed to settle market.')
     } finally {
-      setLoading(false)
+      setResolvingMarketId(null)
     }
   }
 
@@ -1037,25 +965,21 @@ export default function MarketsPage() {
 
                         {isCreator && !market.resolved && !isClosed ? (
                           <div className="resolution-lock">
-                            <span>Resolution locked</span>
-                            <strong>{market.deadline > 0n ? `Unlocks after ${formatDeadlineDateTime(market.deadline)}` : 'Set a deadline before resolution.'}</strong>
+                            <span>AI resolution locked</span>
+                            <strong>{market.deadline > 0n ? `Unlocks after ${formatDeadlineDateTime(market.deadline)}` : 'Set a deadline before AI resolution.'}</strong>
                           </div>
                         ) : null}
 
-                        {isCreator && !market.resolved && isClosed ? (
+                        {!market.resolved && isClosed ? (
                           <>
                             <div className="resolution-review-note">
-                              <span>Creator settlement</span>
-                              <strong>Review recommendation before signing.</strong>
+                              <span>AI settlement</span>
+                              <strong>The creator cannot choose the result. ResolverAgent checks evidence and signs from the authorized resolver wallet.</strong>
                             </div>
                             <div className="bet-actions">
-                              <button className="simulate-btn" type="button" onClick={() => openResolveModal(market, 'YES')} disabled={transactionPending}>
+                              <button className="simulate-btn" type="button" onClick={() => void requestAiResolution(market)} disabled={transactionPending || resolvingMarketId === market.marketId}>
                                 <CheckCircle2 size={13} aria-hidden="true" />
-                                Review YES
-                              </button>
-                              <button className="simulate-btn" type="button" onClick={() => openResolveModal(market, 'NO')} disabled={transactionPending}>
-                                <CheckCircle2 size={13} aria-hidden="true" />
-                                Review NO
+                                {resolvingMarketId === market.marketId ? 'Resolving...' : 'Resolve with AI'}
                               </button>
                             </div>
                           </>
@@ -1280,59 +1204,6 @@ export default function MarketsPage() {
         </div>
       ) : null}
 
-      {resolveModal && selectedResolveMarket && resolutionRecommendation ? (
-        <div className="modal-backdrop" role="presentation" onClick={closeResolveModal}>
-          <div className="modal-shell resolution-modal-shell" role="dialog" aria-modal="true" aria-label="Resolve market dialog" onClick={(event) => event.stopPropagation()}>
-            <div className="modal-top">
-              <div>
-                <div className="card-title">Resolve market</div>
-                <h3>{selectedResolveMarket.title}</h3>
-              </div>
-              <button type="button" className="modal-close" onClick={closeResolveModal} disabled={transactionPending}>Close</button>
-            </div>
-
-            <div className="modal-meta">
-              <div><span>Market</span><strong>#{selectedResolveMarket.marketId}</strong></div>
-              <div><span>Deadline ended</span><strong>{formatDeadlineDateTime(selectedResolveMarket.deadline)}</strong></div>
-              <div><span>Selected result</span><strong>{resolveModal.outcome}</strong></div>
-              <div><span>AI prior</span><strong>{formatPercent(selectedResolveMarket.aiProbability)} YES</strong></div>
-              <div><span>Crowd YES</span><strong>{selectedResolveCrowdOdds === null ? 'No bets' : formatPercent(selectedResolveCrowdOdds)}</strong></div>
-              <div><span>Pool</span><strong>{formatUsdcAmount(selectedResolveMarket.pool)}</strong></div>
-            </div>
-
-            <div className={`resolution-recommendation ${resolutionRecommendation.side === resolveModal.outcome ? 'aligned' : 'conflict'}`}>
-              <div>
-                <span>{resolutionRecommendation.source} recommendation</span>
-                <strong>{resolutionRecommendation.side} · {formatPercent(resolutionRecommendation.confidence)}</strong>
-              </div>
-              <p>{resolutionRecommendation.summary}</p>
-            </div>
-
-            <div className="resolution-evidence">
-              <div>
-                <span>Resolution criteria</span>
-                <p>{selectedResolveMarket.resolutionCriteria}</p>
-              </div>
-              <div>
-                <span>MarketAgent trigger</span>
-                <p>{selectedResolveMarket.triggeredByNews}</p>
-              </div>
-            </div>
-
-            <div className="modal-status warning">
-              Signing this transaction finalizes the market as {resolveModal.outcome}. Betting stops permanently and payouts are calculated from this outcome.
-            </div>
-            {txError ? <div className="modal-status error">{txError}</div> : null}
-            {txSuccess ? <div className="modal-status success">{txSuccess}</div> : null}
-            <button type="button" className="run-btn" onClick={() => void resolveMarketOnChain(selectedResolveMarket, resolveModal.outcome === 'YES')} disabled={transactionPending || selectedResolveMarket.resolved}>
-              {transactionPending ? `Resolving ${resolveModal.outcome}...` : `Sign and Resolve ${resolveModal.outcome}`}
-            </button>
-            <div className="modal-footnote">
-              This review is a frontend safeguard. The current contract still trusts the creator wallet for final resolution.
-            </div>
-          </div>
-        </div>
-      ) : null}
     </>
   )
 }

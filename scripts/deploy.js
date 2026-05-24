@@ -45,14 +45,31 @@ if (output.errors) {
 const compiled = output.contracts['PredictionMarket.sol'].PredictionMarket
 const abi = compiled.abi
 const bytecode = `0x${compiled.evm.bytecode.object}`
+const artifactPath = path.join(__dirname, '..', 'artifacts', 'contracts', 'PredictionMarket.sol', 'PredictionMarket.json')
+
+const writeArtifact = () => {
+  fs.mkdirSync(path.dirname(artifactPath), { recursive: true })
+  fs.writeFileSync(artifactPath, `${JSON.stringify({
+    _format: 'hh-sol-artifact-1',
+    contractName: 'PredictionMarket',
+    sourceName: 'contracts/PredictionMarket.sol',
+    abi,
+    bytecode,
+    deployedBytecode: '0x',
+    linkReferences: {},
+    deployedLinkReferences: {},
+  }, null, 2)}\n`)
+}
 
 async function main() {
+  writeArtifact()
+
   if (process.argv.includes('--compile-only')) {
     console.log(`PredictionMarket compiled. ABI entries: ${abi.length}`)
     return
   }
 
-  const { RPC_URL, DEPLOYER_PRIVATE_KEY } = process.env
+  const { RPC_URL, DEPLOYER_PRIVATE_KEY, AI_RESOLVER_ADDRESS } = process.env
 
   if (!RPC_URL) {
     throw new Error('Missing RPC_URL environment variable')
@@ -62,12 +79,17 @@ async function main() {
     throw new Error('Missing DEPLOYER_PRIVATE_KEY environment variable')
   }
 
+  if (!AI_RESOLVER_ADDRESS) {
+    throw new Error('Missing AI_RESOLVER_ADDRESS environment variable')
+  }
+
   const provider = new ethers.JsonRpcProvider(RPC_URL)
   const wallet = new ethers.Wallet(DEPLOYER_PRIVATE_KEY, provider)
   const factory = new ethers.ContractFactory(abi, bytecode, wallet)
 
   console.log(`Deploying PredictionMarket from ${wallet.address}`)
-  const contract = await factory.deploy()
+  console.log(`AI resolver: ${AI_RESOLVER_ADDRESS}`)
+  const contract = await factory.deploy(AI_RESOLVER_ADDRESS)
   await contract.waitForDeployment()
 
   const address = await contract.getAddress()
