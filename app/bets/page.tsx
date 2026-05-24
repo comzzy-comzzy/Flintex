@@ -441,6 +441,34 @@ export default function BetsPage() {
     if (payoutQuoteReadContracts.length > 0) await refetchPayoutQuotes()
   }
 
+  const waitForSuccessfulTransaction = async (hash: `0x${string}`) => {
+    if (!publicClient) {
+      throw new Error('Public client unavailable.')
+    }
+
+    const receipt = await publicClient.waitForTransactionReceipt({ hash })
+    if (receipt.status !== 'success') {
+      throw new Error(`Transaction reverted. Hash: ${hash}`)
+    }
+
+    return receipt
+  }
+
+  const readWalletPosition = async (marketId: bigint) => {
+    if (!address || !publicClient) {
+      throw new Error('Wallet or public client unavailable.')
+    }
+
+    const result = await publicClient.readContract({
+      address: PREDICTION_MARKET_ADDRESS,
+      abi: PREDICTION_MARKET_ABI,
+      functionName: 'getPosition',
+      args: [marketId, address],
+    })
+
+    return normalizeUserPosition(result)
+  }
+
   const claimPayoutOnChain = async (bet: MyBet) => {
     if (!address) {
       setTxError('Connect your wallet before claiming payout.')
@@ -466,7 +494,12 @@ export default function BetsPage() {
         chainId: ARC_TESTNET_CHAIN_ID,
       })
 
-      await publicClient.waitForTransactionReceipt({ hash })
+      await waitForSuccessfulTransaction(hash)
+      const latestPosition = await readWalletPosition(bet.market.id)
+      if (!latestPosition.claimed) {
+        throw new Error('Claim transaction confirmed, but the position is not marked claimed yet. Refresh and check the contract address.')
+      }
+
       await refreshBetReads()
       setTxSuccess(`Claimed payout for market #${bet.market.marketId}. Transaction: ${hash}`)
     } catch (error) {
@@ -513,7 +546,13 @@ export default function BetsPage() {
         chainId: ARC_TESTNET_CHAIN_ID,
       })
 
-      await publicClient.waitForTransactionReceipt({ hash })
+      await waitForSuccessfulTransaction(hash)
+      const latestPosition = await readWalletPosition(bet.market.id)
+      const latestUnstakeAmount = getUnstakeAmount(bet.market, { ...latestPosition, payout: 0n }, address)
+      if (latestUnstakeAmount > 0n) {
+        throw new Error('Unstake transaction confirmed, but the position still has withdrawable stake. Refresh and check the contract address.')
+      }
+
       await refreshBetReads()
       setTxSuccess(`Unstaked ${formatUsdcAmount(unstakeAmount)} from market #${bet.market.marketId}. Transaction: ${hash}`)
     } catch (error) {
