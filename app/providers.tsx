@@ -26,13 +26,31 @@ const config = getDefaultConfig({
 })
 
 const queryClient = new QueryClient()
-const flintexWalletTheme = darkTheme({
-  accentColor: '#67e8f9',
-  accentColorForeground: '#060a0f',
+const FLINTEX_ICE = '#67e8f9'
+const FLINTEX_ICE_LIGHT = '#a5f3fc'
+const FLINTEX_DARK = '#060a0f'
+
+const baseWalletTheme = darkTheme({
+  accentColor: FLINTEX_ICE,
+  accentColorForeground: FLINTEX_DARK,
   borderRadius: 'small',
   fontStack: 'system',
   overlayBlur: 'small',
 })
+
+const flintexWalletTheme = {
+  ...baseWalletTheme,
+  colors: {
+    ...baseWalletTheme.colors,
+    connectButtonBackground: FLINTEX_ICE,
+    connectButtonInnerBackground: FLINTEX_ICE_LIGHT,
+    connectButtonText: FLINTEX_DARK,
+  },
+  shadows: {
+    ...baseWalletTheme.shadows,
+    connectButton: '0 0 18px rgba(103, 232, 249, 0.22)',
+  },
+}
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
