@@ -1,5 +1,5 @@
 'use client'
-import { RainbowKitProvider, getDefaultConfig } from '@rainbow-me/rainbowkit'
+import { RainbowKitProvider, darkTheme, getDefaultConfig } from '@rainbow-me/rainbowkit'
 import type { Chain } from 'viem'
 import { WagmiProvider } from 'wagmi'
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query'
@@ -26,12 +26,19 @@ const config = getDefaultConfig({
 })
 
 const queryClient = new QueryClient()
+const flintexWalletTheme = darkTheme({
+  accentColor: '#67e8f9',
+  accentColorForeground: '#060a0f',
+  borderRadius: 'small',
+  fontStack: 'system',
+  overlayBlur: 'small',
+})
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider>
+        <RainbowKitProvider theme={flintexWalletTheme}>
           {children}
         </RainbowKitProvider>
       </QueryClientProvider>
