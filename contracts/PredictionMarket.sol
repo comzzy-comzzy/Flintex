@@ -42,6 +42,8 @@ contract PredictionMarket {
 
     mapping(uint256 => Market) public markets;
     mapping(uint256 => mapping(address => Position)) public positions;
+    mapping(uint256 => uint256) public creatorSeedYes;
+    mapping(uint256 => uint256) public creatorSeedNo;
 
     event MarketCreated(
         uint256 indexed marketId,
@@ -59,6 +61,7 @@ contract PredictionMarket {
     );
     event MarketResolved(uint256 indexed marketId, Outcome outcome);
     event PayoutClaimed(uint256 indexed marketId, address indexed user, uint256 payout);
+    event PositionWithdrawn(uint256 indexed marketId, address indexed user, uint256 amount);
     event NoWinnerPoolWithdrawn(uint256 indexed marketId, address indexed creator, uint256 amount);
 
     error AmountZero();
@@ -69,7 +72,9 @@ contract PredictionMarket {
     error MarketResolvedAlready();
     error MarketNotResolved();
     error NotMarketCreator();
+    error MarketNotOpen();
     error AlreadyClaimed();
+    error NoOpenPosition();
     error NoWinningPosition();
     error NoWinners();
     error TransferFailed();
@@ -109,6 +114,9 @@ contract PredictionMarket {
             outcome: Outcome.Unresolved,
             resolved: false
         });
+
+        creatorSeedYes[marketId] = yesSeed;
+        creatorSeedNo[marketId] = noSeed;
 
         positions[marketId][msg.sender] = Position({
             yesAmount: yesSeed,
@@ -162,6 +170,34 @@ contract PredictionMarket {
         _transfer(msg.sender, payout);
 
         emit PayoutClaimed(marketId, msg.sender, payout);
+    }
+
+    function withdrawPosition(uint256 marketId) external returns (uint256 amount) {
+        Market storage market = _getMarket(marketId);
+        if (market.resolved || market.deadline <= block.timestamp) revert MarketNotOpen();
+
+        Position storage position = positions[marketId][msg.sender];
+
+        uint256 lockedYesAmount = msg.sender == market.creator ? creatorSeedYes[marketId] : 0;
+        uint256 lockedNoAmount = msg.sender == market.creator ? creatorSeedNo[marketId] : 0;
+        uint256 yesAmount = position.yesAmount > lockedYesAmount ? position.yesAmount - lockedYesAmount : 0;
+        uint256 noAmount = position.noAmount > lockedNoAmount ? position.noAmount - lockedNoAmount : 0;
+        amount = yesAmount + noAmount;
+        if (amount == 0) revert NoOpenPosition();
+
+        if (yesAmount > 0) {
+            position.yesAmount -= yesAmount;
+            market.totalYes -= yesAmount;
+        }
+
+        if (noAmount > 0) {
+            position.noAmount -= noAmount;
+            market.totalNo -= noAmount;
+        }
+
+        market.pool -= amount;
+        _transfer(msg.sender, amount);
+        emit PositionWithdrawn(marketId, msg.sender, amount);
     }
 
     function withdrawNoWinnerPool(uint256 marketId) external returns (uint256 amount) {

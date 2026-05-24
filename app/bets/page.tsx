@@ -1,11 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { SlidersHorizontal } from 'lucide-react'
+import { CircleDollarSign, RotateCcw, SlidersHorizontal } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import Navbar from '@/components/Navbar'
 import { formatUnits } from 'viem'
-import { useAccount, useReadContract, useReadContracts } from 'wagmi'
+import { useAccount, usePublicClient, useReadContract, useReadContracts, useSwitchChain, useWriteContract } from 'wagmi'
 import {
   ARC_TESTNET_CHAIN_ID,
   PREDICTION_MARKET_ABI,
@@ -56,6 +56,7 @@ type UserPosition = {
 }
 
 type MyBetStatus = 'Open' | 'Closed' | 'Won' | 'Lost' | 'Claimed'
+type MyBetAction = 'claim' | 'unstake'
 
 type MyBet = {
   market: ContractMarket
@@ -210,6 +211,23 @@ const getPositionSideLabel = (position: UserPosition) => {
   return 'None'
 }
 
+const getUnstakeAmount = (market: ContractMarket, position: UserPosition, address?: string) => {
+  if (!address || market.creator.toLowerCase() !== address.toLowerCase()) {
+    return position.yesAmount + position.noAmount
+  }
+
+  const creatorSeedYes = market.liquidity / 2n
+  const creatorSeedNo = market.liquidity - creatorSeedYes
+  const yesAmount = position.yesAmount > creatorSeedYes ? position.yesAmount - creatorSeedYes : 0n
+  const noAmount = position.noAmount > creatorSeedNo ? position.noAmount - creatorSeedNo : 0n
+  return yesAmount + noAmount
+}
+
+const hasPosition = (market: ContractMarket, position: UserPosition, address?: string) => {
+  if (position.yesAmount > 0n || position.noAmount > 0n) return true
+  return getUnstakeAmount(market, position, address) > 0n
+}
+
 const getOutcomeLabel = (market: ContractMarket) => {
   if (!market.resolved) return 'Pending'
   if (market.outcome === 1) return 'YES'
@@ -260,8 +278,14 @@ const buildOpportunity = (market: ContractMarket, crowdOdds: number): BetOpportu
 
 export default function BetsPage() {
   const { address, isConnected } = useAccount()
+  const publicClient = usePublicClient({ chainId: ARC_TESTNET_CHAIN_ID })
+  const { switchChainAsync } = useSwitchChain()
+  const { writeContractAsync, isPending } = useWriteContract()
   const [expandedMarket, setExpandedMarket] = useState<string | null>(null)
   const [kellyFractions, setKellyFractions] = useState<Record<string, number>>({})
+  const [activeAction, setActiveAction] = useState<{ marketId: string; type: MyBetAction } | null>(null)
+  const [txError, setTxError] = useState<string | null>(null)
+  const [txSuccess, setTxSuccess] = useState<string | null>(null)
   const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
@@ -272,6 +296,7 @@ export default function BetsPage() {
   const {
     data: marketCountData,
     isLoading: marketCountLoading,
+    refetch: refetchMarketCount,
   } = useReadContract({
     address: PREDICTION_MARKET_ADDRESS,
     abi: PREDICTION_MARKET_ABI,
@@ -297,6 +322,7 @@ export default function BetsPage() {
   const {
     data: marketResults,
     isLoading: marketsLoading,
+    refetch: refetchMarkets,
   } = useReadContracts({
     contracts: marketReadContracts,
     query: { enabled: marketReadContracts.length > 0 },
@@ -324,6 +350,7 @@ export default function BetsPage() {
   const {
     data: positionResults,
     isLoading: positionsLoading,
+    refetch: refetchPositions,
   } = useReadContracts({
     contracts: positionReadContracts,
     query: { enabled: positionReadContracts.length > 0 },
@@ -340,6 +367,7 @@ export default function BetsPage() {
   const {
     data: payoutQuoteResults,
     isLoading: payoutQuotesLoading,
+    refetch: refetchPayoutQuotes,
   } = useReadContracts({
     contracts: payoutQuoteReadContracts,
     query: { enabled: payoutQuoteReadContracts.length > 0 },
@@ -367,7 +395,7 @@ export default function BetsPage() {
   const myBets = useMemo(() => allMarkets
     .map((market): MyBet | null => {
       const position = userPositions.get(market.marketId)
-      if (!position || (position.yesAmount === 0n && position.noAmount === 0n)) return null
+      if (!position || !hasPosition(market, position, address)) return null
 
       return {
         market,
@@ -378,7 +406,7 @@ export default function BetsPage() {
       }
     })
     .filter((bet): bet is MyBet => bet !== null),
-  [allMarkets, now, userPositions])
+  [address, allMarkets, now, userPositions])
 
   const marketsById = useMemo(
     () => new Map(markets.map((market) => [market.marketId, market])),
@@ -400,6 +428,100 @@ export default function BetsPage() {
   const openBetCount = myBets.filter((bet) => bet.status === 'Open' || bet.status === 'Closed').length
   const isLoadingMarkets = marketCountLoading || marketsLoading
   const isLoadingPositions = isLoadingMarkets || positionsLoading || payoutQuotesLoading
+  const transactionPending = isPending || activeAction !== null
+
+  const ensureArcChain = async () => {
+    await switchChainAsync({ chainId: ARC_TESTNET_CHAIN_ID })
+  }
+
+  const refreshBetReads = async () => {
+    await refetchMarketCount()
+    await refetchMarkets()
+    if (positionReadContracts.length > 0) await refetchPositions()
+    if (payoutQuoteReadContracts.length > 0) await refetchPayoutQuotes()
+  }
+
+  const claimPayoutOnChain = async (bet: MyBet) => {
+    if (!address) {
+      setTxError('Connect your wallet before claiming payout.')
+      return
+    }
+
+    if (!publicClient) {
+      setTxError('Public client unavailable.')
+      return
+    }
+
+    try {
+      setActiveAction({ marketId: bet.market.marketId, type: 'claim' })
+      setTxError(null)
+      setTxSuccess(null)
+      await ensureArcChain()
+
+      const hash = await writeContractAsync({
+        address: PREDICTION_MARKET_ADDRESS,
+        abi: PREDICTION_MARKET_ABI,
+        functionName: 'claimPayout',
+        args: [bet.market.id],
+        chainId: ARC_TESTNET_CHAIN_ID,
+      })
+
+      await publicClient.waitForTransactionReceipt({ hash })
+      await refreshBetReads()
+      setTxSuccess(`Claimed payout for market #${bet.market.marketId}. Transaction: ${hash}`)
+    } catch (error) {
+      setTxError(error instanceof Error ? error.message : 'Failed to claim payout.')
+    } finally {
+      setActiveAction(null)
+    }
+  }
+
+  const unstakePositionOnChain = async (bet: MyBet) => {
+    const unstakeAmount = getUnstakeAmount(bet.market, bet.position, address)
+
+    if (!address) {
+      setTxError('Connect your wallet before unstaking.')
+      return
+    }
+
+    if (bet.status !== 'Open') {
+      setTxError('Unstaking is only available before the market deadline and before settlement.')
+      return
+    }
+
+    if (unstakeAmount <= 0n) {
+      setTxError('No open stake is available to unstake for this market.')
+      return
+    }
+
+    if (!publicClient) {
+      setTxError('Public client unavailable.')
+      return
+    }
+
+    try {
+      setActiveAction({ marketId: bet.market.marketId, type: 'unstake' })
+      setTxError(null)
+      setTxSuccess(null)
+      await ensureArcChain()
+
+      const hash = await writeContractAsync({
+        address: PREDICTION_MARKET_ADDRESS,
+        abi: PREDICTION_MARKET_ABI,
+        functionName: 'withdrawPosition',
+        args: [bet.market.id],
+        chainId: ARC_TESTNET_CHAIN_ID,
+      })
+
+      await publicClient.waitForTransactionReceipt({ hash })
+      await refreshBetReads()
+      setTxSuccess(`Unstaked ${formatUsdcAmount(unstakeAmount)} from market #${bet.market.marketId}. Transaction: ${hash}`)
+    } catch (error) {
+      setTxError(error instanceof Error ? error.message : 'Failed to unstake position.')
+    } finally {
+      setActiveAction(null)
+    }
+  }
 
   return (
     <>
@@ -471,6 +593,8 @@ export default function BetsPage() {
 
         <div className="card my-bets-card page-anim page-anim-5">
           <div className="card-title">My Bets</div>
+          {txError ? <div className="modal-status error">{txError}</div> : null}
+          {txSuccess ? <div className="modal-status success">{txSuccess}</div> : null}
           {!isConnected ? (
             <div className="empty-market-state">
               <p>Connect your wallet to see your placed bets, outcomes, and claimable payout status.</p>
@@ -487,7 +611,13 @@ export default function BetsPage() {
             <div className="market-list">
               {myBets.map((bet) => {
                 const totalStaked = bet.position.yesAmount + bet.position.noAmount
-                const payoutLabel = bet.status === 'Won'
+                const unstakeAmount = getUnstakeAmount(bet.market, bet.position, address)
+                const canClaim = bet.status === 'Won' && bet.position.payout > 0n
+                const canUnstake = bet.status === 'Open' && unstakeAmount > 0n
+                const isActionPending = activeAction?.marketId === bet.market.marketId
+                const payoutLabel = bet.status === 'Open'
+                  ? formatUsdcAmount(unstakeAmount)
+                  : bet.status === 'Won'
                   ? formatUsdcAmount(bet.position.payout)
                   : bet.status === 'Claimed'
                     ? 'Claimed'
@@ -514,8 +644,29 @@ export default function BetsPage() {
                     </div>
                     <div className="market-score my-bet-score">
                       <span>{payoutLabel}</span>
-                      <small>{bet.status === 'Won' ? 'claimable' : bet.status === 'Closed' ? 'awaiting resolution' : 'payout'}</small>
-                      {bet.status === 'Won' ? <Link href="/markets" className="my-bet-action">Claim</Link> : null}
+                      <small>{bet.status === 'Open' ? 'available to unstake' : bet.status === 'Won' ? 'claimable' : bet.status === 'Closed' ? 'awaiting resolution' : 'payout'}</small>
+                      {canUnstake ? (
+                        <button
+                          className="my-bet-action"
+                          type="button"
+                          onClick={() => void unstakePositionOnChain(bet)}
+                          disabled={transactionPending}
+                        >
+                          <RotateCcw size={12} aria-hidden="true" />
+                          {isActionPending && activeAction?.type === 'unstake' ? 'Unstaking' : 'Unstake'}
+                        </button>
+                      ) : null}
+                      {canClaim ? (
+                        <button
+                          className="my-bet-action"
+                          type="button"
+                          onClick={() => void claimPayoutOnChain(bet)}
+                          disabled={transactionPending}
+                        >
+                          <CircleDollarSign size={12} aria-hidden="true" />
+                          {isActionPending && activeAction?.type === 'claim' ? 'Claiming' : 'Claim'}
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                 )
@@ -631,7 +782,7 @@ export default function BetsPage() {
             <div className="card-title">Agent Log</div>
             <div className="log-box dashboard-log">
               <div className="log-line">BetAgent reads open markets from the deployed PredictionMarket contract.</div>
-              <div className="log-line">My Bets reads this wallet's getPosition and quotePayout data across all contract markets.</div>
+              <div className="log-line">My Bets reads this wallet&apos;s getPosition and quotePayout data, then calls withdrawPosition or claimPayout when available.</div>
               <div className="log-line">AI probability, YES/NO totals, pool amounts, and deadlines come from contract reads.</div>
               <div className="log-line">Kelly sizing uses f = (bp - q) / b against current crowd implied odds.</div>
             </div>

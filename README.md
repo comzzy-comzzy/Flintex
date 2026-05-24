@@ -13,6 +13,7 @@ Flintex is now wired to a deployed Arc testnet prediction market contract. The a
 - Run MarketAgent through FreeModel to generate macro market drafts.
 - Create binary prediction markets onchain with USDC seed liquidity.
 - Place YES or NO bets with an approve-then-bet wallet flow.
+- Unstake open, unresolved bet positions back to the wallet before the market deadline.
 - Read markets, pools, odds, deadlines, and positions from the contract.
 - Show BetAgent opportunities using AI probability, real crowd odds, Kelly sizing, and high-alpha flags.
 - Show a compact My Bets section with Open, Closed, Won, Lost, and Claimed states.
@@ -25,7 +26,7 @@ Flintex is now wired to a deployed Arc testnet prediction market contract. The a
 - Testnet USDC: `0x3600000000000000000000000000000000000000`
 - USDC decimals: `6`
 
-The frontend reads the PredictionMarket ABI from `artifacts/contracts/PredictionMarket.sol/PredictionMarket.json` and the configured address from `NEXT_PUBLIC_PREDICTION_MARKET_ADDRESS`, falling back to the deployed testnet address above.
+The frontend reads the PredictionMarket ABI from `artifacts/contracts/PredictionMarket.sol/PredictionMarket.json` and the configured address from `NEXT_PUBLIC_PREDICTION_MARKET_ADDRESS`, falling back to the deployed testnet address above. After changing the Solidity contract, redeploy and update `NEXT_PUBLIC_PREDICTION_MARKET_ADDRESS` before using newly added functions such as `withdrawPosition`.
 
 ## Agent Routes
 

@@ -308,7 +308,8 @@ body {
 .my-bet-meta span { color: #94a3b8; background: #090d14; border: 1px solid #0f1e2e; border-radius: 999px; padding: 5px 7px; font-family: 'Geist Mono', monospace; font-size: 9.5px; line-height: 1; white-space: nowrap; }
 .my-bet-score { min-width: 118px; }
 .my-bet-score span { font-size: 18px; font-family: 'Geist Mono', monospace; overflow-wrap: anywhere; }
-.my-bet-action { display: inline-flex; justify-content: center; margin-top: 8px; color: #060a0f; background: #67e8f9; border-radius: 999px; padding: 6px 9px; font-family: 'Geist Mono', monospace; font-size: 10px; line-height: 1; text-decoration: none; }
+.my-bet-action { display: inline-flex; align-items: center; justify-content: center; gap: 5px; margin-top: 8px; color: #060a0f; background: #67e8f9; border: 0; border-radius: 999px; padding: 6px 9px; font-family: 'Geist Mono', monospace; font-size: 10px; line-height: 1; text-decoration: none; cursor: pointer; }
+.my-bet-action:disabled { background: #1e3a4f; color: #475569; cursor: not-allowed; }
 .status-badge { display: inline-flex; margin-left: 8px; border-radius: 999px; padding: 4px 7px; border: 1px solid currentColor; font-family: 'Geist Mono', monospace; font-size: 9px; line-height: 1; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; }
 .status-open { color: #67e8f9; background: #0d1520; }
 .status-closed { color: #facc15; background: #2d2408; }
