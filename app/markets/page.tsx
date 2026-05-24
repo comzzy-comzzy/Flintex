@@ -4,11 +4,12 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { Activity, CheckCircle2, CircleDollarSign, Plus, RefreshCw, Send } from 'lucide-react'
 import Navbar from '@/components/Navbar'
-import { formatUnits, parseEventLogs, parseUnits, type Log } from 'viem'
+import { formatUnits, parseEventLogs, parseUnits, zeroAddress, type Log } from 'viem'
 import { useAccount, usePublicClient, useReadContract, useReadContracts, useSwitchChain, useWriteContract } from 'wagmi'
 import {
   ARC_TESTNET_CHAIN_ID,
   ERC20_APPROVE_ABI,
+  ERC20_BALANCE_OF_ABI,
   PREDICTION_MARKET_ABI,
   PREDICTION_MARKET_ADDRESS,
   USDC_ADDRESS,
@@ -135,6 +136,12 @@ const formatUsdcAmount = (value: bigint) => {
     }).format(numeric)} USDC`
   }
   return `${formatted} USDC`
+}
+
+const truncateUsdcAmount = (value: bigint, decimals = 2) => {
+  const formatted = formatUnits(value, USDC_DECIMALS)
+  const [whole, fraction = ''] = formatted.split('.')
+  return `${whole}.${fraction.padEnd(decimals, '0').slice(0, decimals)}`
 }
 
 const formatPercent = (value: number) => `${round(value, 1).toFixed(1)}%`
@@ -369,6 +376,19 @@ export default function MarketsPage() {
     query: { enabled: payoutQuoteReadContracts.length > 0 },
   })
 
+  const {
+    data: walletUsdcBalance,
+    isLoading: walletUsdcBalanceLoading,
+    refetch: refetchWalletUsdcBalance,
+  } = useReadContract({
+    address: USDC_ADDRESS,
+    abi: ERC20_BALANCE_OF_ABI,
+    functionName: 'balanceOf',
+    args: [address ?? zeroAddress],
+    chainId: ARC_TESTNET_CHAIN_ID,
+    query: { enabled: Boolean(address) },
+  })
+
   const userPositions = useMemo(() => {
     const nextPositions = new Map<string, UserPosition>()
 
@@ -400,12 +420,21 @@ export default function MarketsPage() {
   }, [betModal, markets])
 
   const betAmountUnits = useMemo(() => (betModal ? parseUsdcAmount(betModal.amount) : 0n), [betModal])
+  const walletUsdcBalanceReady = typeof walletUsdcBalance === 'bigint'
+  const availableBetBalance = walletUsdcBalanceReady ? walletUsdcBalance : 0n
+  const betExceedsBalance = walletUsdcBalanceReady && betAmountUnits > 0n && betAmountUnits > availableBetBalance
+  const walletBalanceLabel = walletUsdcBalanceLoading
+    ? 'Loading balance...'
+    : walletUsdcBalanceReady
+      ? `${truncateUsdcAmount(availableBetBalance, USDC_DECIMALS)} USDC available`
+      : 'Balance unavailable'
   const selectedCrowdOdds = selectedBetMarket ? getCrowdOdds(selectedBetMarket) : null
   const selectedBetImpliedOdds = selectedCrowdOdds !== null && betModal
     ? betModal.side === 'YES' ? selectedCrowdOdds : 100 - selectedCrowdOdds
     : null
   const selectedDecimalOdds = selectedBetMarket && betModal ? getBetDecimalOdds(selectedBetMarket, betModal.side) : null
   const transactionPending = loading || isPending || approveWrite.isPending
+  const canSubmitBet = !transactionPending && betStep !== 'confirmed' && walletUsdcBalanceReady && !betExceedsBalance && betAmountUnits > 0n
   const isReadingMarkets = marketCountLoading || marketsLoading
   const scanLabel = scanState === 'READY' ? 'READY TO SCAN' : scanState === 'COMPLETE' ? 'SCAN COMPLETE' : scanState
   const scanClass = scanState === 'ERROR' ? 'regime-off' : scanState === 'COMPLETE' ? 'regime-on' : 'regime-analyzing'
@@ -419,6 +448,7 @@ export default function MarketsPage() {
     await refetchMarkets()
     if (positionReadContracts.length > 0) await refetchPositions()
     if (payoutQuoteReadContracts.length > 0) await refetchPayoutQuotes()
+    if (address) await refetchWalletUsdcBalance()
   }
 
   const parseMarketCreatedId = (receiptLogs: Log[]) => {
@@ -633,6 +663,16 @@ export default function MarketsPage() {
     const amount = betAmountUnits
     if (amount <= 0n) {
       setTxError('Enter a valid USDC amount.')
+      return
+    }
+
+    if (!walletUsdcBalanceReady) {
+      setTxError('USDC balance is still loading. Try again in a moment.')
+      return
+    }
+
+    if (amount > availableBetBalance) {
+      setTxError(`Insufficient USDC balance. Available: ${formatUsdcAmount(availableBetBalance)}.`)
       return
     }
 
@@ -1083,14 +1123,29 @@ export default function MarketsPage() {
               <div><span>Pool</span><strong>{formatUsdcAmount(selectedBetMarket.pool)}</strong></div>
             </div>
             <label className="market-form">
-              <span>USDC amount</span>
+              <div className="amount-label-row">
+                <span>USDC amount</span>
+                <button
+                  type="button"
+                  className="balance-max-btn"
+                  onClick={() => setBetModal((current) => current ? { ...current, amount: truncateUsdcAmount(availableBetBalance, USDC_DECIMALS) } : current)}
+                  disabled={transactionPending || availableBetBalance <= 0n}
+                >
+                  Max
+                </button>
+              </div>
               <input
                 value={betModal.amount}
                 onChange={(event) => setBetModal((current) => current ? { ...current, amount: event.target.value } : current)}
                 placeholder="0.00"
                 inputMode="decimal"
+                aria-describedby="wallet-usdc-balance"
               />
             </label>
+            <div className={`wallet-balance-row ${betExceedsBalance ? 'balance-warning' : ''}`} id="wallet-usdc-balance">
+              <span>Wallet balance</span>
+              <strong>{walletBalanceLabel}</strong>
+            </div>
             <div className="modal-payout">
               <span>Expected payout if win</span>
               <strong>{formatUsdcAmount(quotePotentialPayout(selectedBetMarket, betModal.side, betAmountUnits))}</strong>
@@ -1114,13 +1169,19 @@ export default function MarketsPage() {
             ) : null}
             {txError ? <div className="modal-status error">{txError}</div> : null}
             {txSuccess ? <div className="modal-status success">{txSuccess}</div> : null}
-            <button type="button" className="run-btn" onClick={submitBet} disabled={transactionPending || betStep === 'confirmed'}>
+            <button type="button" className="run-btn" onClick={submitBet} disabled={!canSubmitBet}>
               {betStep === 'approving'
                 ? 'Approving USDC...'
                 : betStep === 'betting'
                   ? 'Submitting bet...'
                   : betStep === 'confirmed'
                     ? 'Bet Confirmed'
+                    : walletUsdcBalanceLoading
+                      ? 'Loading Balance...'
+                    : !walletUsdcBalanceReady
+                      ? 'Balance Unavailable'
+                    : betExceedsBalance
+                      ? 'Insufficient USDC Balance'
                     : 'Approve and Confirm Bet'}
             </button>
             <div className="modal-footnote">

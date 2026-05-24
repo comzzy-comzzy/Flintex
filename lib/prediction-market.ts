@@ -25,3 +25,13 @@ export const ERC20_APPROVE_ABI = [
     outputs: [{ name: '', type: 'bool' }],
   },
 ] as const
+
+export const ERC20_BALANCE_OF_ABI = [
+  {
+    name: 'balanceOf',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'account', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+] as const
