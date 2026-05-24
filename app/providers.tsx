@@ -20,6 +20,9 @@ const arcTestnet = {
 
 const config = getDefaultConfig({
   appName: 'Flintex',
+  appDescription: 'Three autonomous AI agents that manage portfolio strategy, prediction markets, and intelligent betting on Arc.',
+  appUrl: 'https://flintex-gold.vercel.app',
+  appIcon: 'https://flintex-gold.vercel.app/flintex-icon.png',
   projectId: 'flintex-agora',
   chains: [arcTestnet],
   ssr: true,

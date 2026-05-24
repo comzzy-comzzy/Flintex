@@ -6,6 +6,15 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Flintex — Three Agents. One Capital Pool.",
   description: "Three autonomous AI agents that manage your portfolio, create prediction markets, and find intelligent betting opportunities — all settled in USDC on Arc.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/flintex-icon.png", type: "image/png", sizes: "512x512" },
+      { url: "/flintex-icon.svg", type: "image/svg+xml" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: "/flintex-icon-192.png",
+  },
 };
 
 export default function RootLayout({
