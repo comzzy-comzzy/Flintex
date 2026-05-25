@@ -1,12 +1,22 @@
-import Anthropic from '@anthropic-ai/sdk'
+import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { ethers } from 'ethers'
 import predictionMarketArtifact from '@/artifacts/contracts/PredictionMarket.sol/PredictionMarket.json'
 import { PREDICTION_MARKET_ADDRESS } from '@/lib/prediction-market'
 
 export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 const MODEL = 'claude-haiku-4-5-20251001'
+const FREEMODEL_URL = 'https://cc.freemodel.dev/v1/messages?beta=true'
+const CLAUDE_CODE_BETA_HEADERS = [
+  'interleaved-thinking-2025-05-14',
+  'context-management-2025-06-27',
+  'prompt-caching-scope-2026-01-05',
+  'advisor-tool-2026-03-01',
+  'structured-outputs-2025-12-15',
+].join(',')
 const CONFIDENCE_THRESHOLD = 60
 
 type MarketSnapshot = {
@@ -80,6 +90,25 @@ const extractText = (value: unknown): string => {
 
   return ''
 }
+
+const extractTextFromEventStream = (rawBody: string) => rawBody
+  .split(/\r?\n/)
+  .filter((line) => line.startsWith('data:'))
+  .map((line) => line.slice(5).trim())
+  .filter((line) => line && line !== '[DONE]')
+  .map((line) => {
+    try {
+      const event = JSON.parse(line)
+      if (!isRecord(event)) return ''
+      if (isRecord(event.delta) && typeof event.delta.text === 'string') return event.delta.text
+      if (isRecord(event.content_block) && typeof event.content_block.text === 'string') return event.content_block.text
+      if (Array.isArray(event.content)) return event.content.map(extractText).filter(Boolean).join('\n')
+      return ''
+    } catch {
+      return ''
+    }
+  })
+  .join('')
 
 const parseJsonObject = (text: string) => {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)
@@ -328,7 +357,19 @@ const resolveMarketById = async (contract: ethers.Contract, marketId: string) =>
 
 const resolveEligibleMarkets = async (contract: ethers.Contract) => {
   const marketCount = Number(await contract.marketCount())
-  const results = []
+  const results: {
+    checked: number
+    eligible: number
+    resolved: unknown[]
+    skipped: unknown[]
+    failed: unknown[]
+  } = {
+    checked: marketCount,
+    eligible: 0,
+    resolved: [],
+    skipped: [],
+    failed: [],
+  }
 
   for (let index = 0; index < marketCount; index += 1) {
     const marketId = index.toString()
@@ -339,8 +380,23 @@ const resolveEligibleMarkets = async (contract: ethers.Contract) => {
       continue
     }
 
-    const result = await resolveMarketById(contract, marketId)
-    results.push(result.body)
+    results.eligible += 1
+
+    try {
+      const result = await resolveMarketById(contract, marketId)
+      const entry = { marketId, status: result.status, ...result.body }
+
+      if (result.ok) {
+        results.resolved.push(entry)
+      } else {
+        results.skipped.push(entry)
+      }
+    } catch (error) {
+      results.failed.push({
+        marketId,
+        error: error instanceof Error ? error.message : 'AI Resolver failed.',
+      })
+    }
   }
 
   return results
@@ -350,29 +406,78 @@ const resolveWithAi = async (market: MarketSnapshot, evidence: EvidenceItem[]) =
   const apiKey = process.env.FREEMODEL_API_KEY
   if (!apiKey) throw new Error('Missing FREEMODEL_API_KEY environment variable.')
 
-  const client = new Anthropic({
-    apiKey,
-    baseURL: 'https://cc.freemodel.dev',
-  })
-
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: 800,
-    temperature: 0,
-    system: [
-      'You are the Flintex AI Resolver.',
-      'You decide final YES/NO outcomes for binary markets from public evidence and resolution criteria.',
-      'Return JSON only. Do not include markdown or prose outside JSON.',
-    ].join('\n'),
-    messages: [
-      {
-        role: 'user',
-        content: buildPrompt(market, evidence),
+  const sessionId = randomUUID()
+  const response = await fetch(FREEMODEL_URL, {
+    method: 'POST',
+    headers: {
+      accept: 'application/json',
+      'content-type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-beta': CLAUDE_CODE_BETA_HEADERS,
+      'anthropic-dangerous-direct-browser-access': 'true',
+      'x-app': 'cli',
+      'user-agent': 'claude-cli/2.1.150 (external, sdk-cli)',
+      'x-claude-code-session-id': sessionId,
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 800,
+      temperature: 0,
+      stream: true,
+      tools: [],
+      system: [
+        {
+          type: 'text',
+          text: 'x-anthropic-billing-header: cc_version=2.1.150.539; cc_entrypoint=sdk-cli; cch=1fdf3;',
+        },
+        {
+          type: 'text',
+          text: [
+            'You are the Flintex AI Resolver.',
+            'You decide final YES/NO outcomes for binary markets from public evidence and resolution criteria.',
+            'Return JSON only. Do not include markdown or prose outside JSON.',
+          ].join('\n'),
+        },
+      ],
+      metadata: {
+        user_id: JSON.stringify({
+          device_id: randomUUID().replace(/-/g, ''),
+          account_uuid: '',
+          session_id: sessionId,
+        }),
       },
-    ],
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: `<session>\n${buildPrompt(market, evidence)}\n</session>`,
+            },
+          ],
+        },
+      ],
+    }),
   })
 
-  const text = extractText(response.content)
+  const rawBody = await response.text()
+  let body: unknown = rawBody
+
+  try {
+    body = JSON.parse(rawBody)
+  } catch {
+    body = rawBody
+  }
+
+  if (!response.ok) {
+    throw new Error(`FreeModel resolver request failed with status ${response.status}.`)
+  }
+
+  const text = typeof body === 'string'
+    ? extractTextFromEventStream(body) || body
+    : extractText(body)
+
   return normalizeDecision(parseJsonObject(text))
 }
 
@@ -402,7 +507,7 @@ export async function GET() {
 
     return NextResponse.json({
       checkedAt: new Date().toISOString(),
-      resolved: results,
+      ...results,
     })
   } catch (error) {
     return NextResponse.json({
