@@ -45,6 +45,25 @@ The frontend reads the PredictionMarket ABI from `artifacts/contracts/Prediction
 - USDC prediction markets and wallet-signed transactions
 - Vercel
 
+## Why Flintex Fits Arc OSS
+
+Flintex should be chosen for Arc OSS because it turns Arc from infrastructure examples into a reusable agentic finance application pattern. Arc already gives builders the core primitives for stablecoin-native finance: USDC gas, predictable fees, deterministic sub-second settlement, EVM compatibility, Circle-stack integration, CCTP, Gateway, wallets, and smart contract tooling. Flintex builds on those primitives with an end-to-end product loop where AI agents reason about markets, recommend portfolio allocation, create prediction market drafts, size positions, and trigger wallet-approved USDC actions on Arc testnet.
+
+The reusable primitives exposed by Flintex are useful beyond this project:
+
+1. A USDC-native `PredictionMarket` contract on Arc testnet with market creation, YES/NO positions, payout quoting, claims, open-position withdrawal, and an authorized AI resolver role.
+2. Agent JSON interfaces other builders can reuse. `PortfolioAgent` returns market regime, USYC allocation, and reasoning. `MarketAgent` returns binary market drafts with resolution criteria, deadline, liquidity, category, and AI probability. `BetAgent` returns true probability, crowd odds, Kelly sizing, expected value, high-alpha flags, and a recommendation.
+3. A resolver flow where the market creator cannot unilaterally choose the result. Closed markets are resolved by an authorized AI resolver wallet, separating market creation from settlement.
+4. A wallet-approved execution model where agents generate recommendations or transaction intents, but users retain final approval through their wallet before capital moves.
+5. A correction and override layer for real-world market mistakes such as typos, clarified criteria, corrected deadlines, or updated resolution context without redeploying the contract.
+6. Deployment and seeding scripts that make it easy for another Arc builder to deploy the contract and create their first test market.
+
+Compared with the existing Arc and Circle builder repos, Flintex is less of a single-purpose sample and more of a composable operating layer for autonomous financial agents. It shows how Arc's stablecoin-native settlement can support agentic economic activity: agents do the reasoning, users keep wallet-level control, and Arc provides fast, predictable USDC settlement.
+
+Other builders could fork Flintex to build agent-run prediction markets, treasury agents, betting agents, portfolio allocation agents, resolution agents, or any application where AI produces financial decisions that must pass user or policy gates before settling onchain. That makes Flintex a strong Arc OSS candidate because it demonstrates a complete, reusable pattern for agentic finance on Arc, not just one isolated integration.
+
+References: [Arc](https://www.arc.io/), [Arc docs](https://docs.arc.io/arc-chain), [circlefin/arc-node](https://github.com/circlefin/arc-node), and [circlefin/skills](https://github.com/circlefin/skills).
+
 ## Environment
 
 Create `.env.local` from `.env.example` and fill only local or deployment secrets:

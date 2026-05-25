@@ -58,18 +58,24 @@ const coreDocs = [
   },
   {
     number: '10',
+    label: 'ARC_OSS_RATIONALE',
+    href: '#arc-oss-rationale',
+    summary: 'Why Flintex is a reusable Arc OSS pattern for agentic finance.',
+  },
+  {
+    number: '11',
     label: 'FAQ',
     href: '#faq',
     summary: 'Direct answers about custody, Arc, USDC, agents, risks, and launch scope.',
   },
   {
-    number: '11',
+    number: '12',
     label: 'GLOSSARY',
     href: '#glossary',
     summary: 'Definitions for the Flintex vocabulary used across the product.',
   },
   {
-    number: '12',
+    number: '13',
     label: 'ROADMAP',
     href: '#roadmap',
     summary: 'The staged buildout from current testnet app to agent marketplace OS.',
@@ -195,6 +201,15 @@ const glossary = [
   ['Risk Gate', 'A policy rule that limits exposure, drawdown, market type, or execution authority before an agent can spend capital.'],
   ['Resolution Criteria', 'The exact rule that determines whether a Flintex prediction market settles YES or NO.'],
   ['Decision Log', 'A human-readable record of why an agent recommended or executed an action.'],
+]
+
+const arcOssPrimitives = [
+  'A USDC-native PredictionMarket contract on Arc testnet with market creation, YES/NO positions, payout quoting, claims, open-position withdrawal, and an authorized AI resolver role.',
+  'Agent JSON interfaces other builders can reuse: PortfolioAgent returns market regime, USYC allocation, and reasoning; MarketAgent returns binary market drafts with resolution criteria, deadline, liquidity, category, and AI probability; BetAgent returns true probability, crowd odds, Kelly sizing, expected value, high-alpha flags, and a recommendation.',
+  'A resolver flow where the market creator cannot unilaterally choose the result. Closed markets are resolved by an authorized AI resolver wallet, separating market creation from settlement.',
+  'A wallet-approved execution model where agents generate recommendations or transaction intents, but users retain final approval through their wallet before capital moves.',
+  'A correction and override layer for real-world market mistakes such as typos, clarified criteria, corrected deadlines, or updated resolution context without redeploying the contract.',
+  'Deployment and seeding scripts that make it easy for another Arc builder to deploy the contract and create their first test market.',
 ]
 
 export default function DocsPage() {
@@ -498,9 +513,38 @@ returns: { "opportunities": [{ "marketId": "1", "title": "...", "aiProbability":
               </div>
             </section>
 
-            <section className="doc-section" id="faq">
+            <section className="doc-section" id="arc-oss-rationale">
               <div className="doc-section-header">
                 <div className="doc-section-number">10</div>
+                <div>
+                  <h2>Arc OSS rationale</h2>
+                  <p>
+                    Flintex should be chosen for Arc OSS because it turns Arc from infrastructure examples into a reusable agentic finance application pattern. Arc already gives builders the core primitives for stablecoin-native finance: USDC gas, predictable fees, deterministic sub-second settlement, EVM compatibility, Circle-stack integration, CCTP, Gateway, wallets, and smart contract tooling. Flintex builds on those primitives with an end-to-end product loop where AI agents reason about markets, recommend portfolio allocation, create prediction market drafts, size positions, and trigger wallet-approved USDC actions on Arc testnet.
+                  </p>
+                  <p>
+                    The reusable primitives exposed by Flintex are useful beyond this project:
+                  </p>
+                  <ul className="doc-list">
+                    {arcOssPrimitives.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                  <p>
+                    Compared with the existing Arc and Circle builder repos, Flintex is less of a single-purpose sample and more of a composable operating layer for autonomous financial agents. It shows how Arc&apos;s stablecoin-native settlement can support agentic economic activity: agents do the reasoning, users keep wallet-level control, and Arc provides fast, predictable USDC settlement.
+                  </p>
+                  <p>
+                    Other builders could fork Flintex to build agent-run prediction markets, treasury agents, betting agents, portfolio allocation agents, resolution agents, or any application where AI produces financial decisions that must pass user or policy gates before settling onchain. That makes Flintex a strong Arc OSS candidate because it demonstrates a complete, reusable pattern for agentic finance on Arc, not just one isolated integration.
+                  </p>
+                  <p>
+                    References: <a href="https://www.arc.io/">Arc</a>, <a href="https://docs.arc.io/arc-chain">Arc docs</a>, <a href="https://github.com/circlefin/arc-node">circlefin/arc-node</a>, and <a href="https://github.com/circlefin/skills">circlefin/skills</a>.
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <section className="doc-section" id="faq">
+              <div className="doc-section-header">
+                <div className="doc-section-number">11</div>
                 <div>
                   <h2>FAQ</h2>
                   <div className="faq-grid">
@@ -517,7 +561,7 @@ returns: { "opportunities": [{ "marketId": "1", "title": "...", "aiProbability":
 
             <section className="doc-section" id="glossary">
               <div className="doc-section-header">
-                <div className="doc-section-number">11</div>
+                <div className="doc-section-number">12</div>
                 <div>
                   <h2>Glossary</h2>
                   <div className="glossary-grid">
@@ -534,7 +578,7 @@ returns: { "opportunities": [{ "marketId": "1", "title": "...", "aiProbability":
 
             <section className="doc-section" id="roadmap">
               <div className="doc-section-header">
-                <div className="doc-section-number">12</div>
+                <div className="doc-section-number">13</div>
                 <div>
                   <h2>Roadmap</h2>
                   <p>
