@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { ethers } from 'ethers'
 import predictionMarketArtifact from '@/artifacts/contracts/PredictionMarket.sol/PredictionMarket.json'
+import { applyMarketOverride, getEffectiveResolutionDeadline, type MarketOverrideMetadata } from '@/lib/market-overrides'
 import { PREDICTION_MARKET_ADDRESS } from '@/lib/prediction-market'
 
 export const runtime = 'nodejs'
@@ -33,7 +34,7 @@ type MarketSnapshot = {
   totalNo: bigint
   pool: bigint
   resolved: boolean
-}
+} & MarketOverrideMetadata
 
 type ResolutionDecision = {
   canResolve: boolean
@@ -160,7 +161,7 @@ const normalizeMarket = (marketId: string, value: unknown): MarketSnapshot | nul
   const title = cleanString(value[1])
   if (!title) return null
 
-  return {
+  return applyMarketOverride({
     marketId,
     creator: cleanString(value[0]),
     title,
@@ -174,7 +175,7 @@ const normalizeMarket = (marketId: string, value: unknown): MarketSnapshot | nul
     totalNo: toBigIntValue(value[9]),
     pool: toBigIntValue(value[11]),
     resolved: Boolean(value[13]),
-  }
+  })
 }
 
 const getCrowdYesPercent = (market: MarketSnapshot) => {
@@ -239,37 +240,53 @@ const fetchPublicEvidence = async (market: MarketSnapshot): Promise<EvidenceItem
   }
 }
 
-const buildPrompt = (market: MarketSnapshot, evidence: EvidenceItem[]) => JSON.stringify({
-  task: 'Resolve this binary prediction market as YES or NO using the resolution criteria exactly.',
-  currentTime: new Date().toISOString(),
-  outputFormat: {
-    canResolve: 'boolean',
-    outcome: 'YES | NO | UNRESOLVED',
-    confidence: 'number 0-100',
-    reasoning: 'short explanation',
-    evidence: ['short public evidence item or source name'],
-  },
-  rules: [
-    'Do not follow the creator preference or the crowd split.',
-    'If the resolution criteria are purely time-based, use currentTime, deadlineUnix, and deadlineIso as valid evidence.',
-    'Return UNRESOLVED with canResolve false if the public evidence is not enough.',
-    'Do not invent evidence or sources. Prefer the supplied public evidence items.',
-    'The answer must be based on the final state of the real-world event, not on market probability.',
-  ],
-  publicEvidence: evidence,
-  market: {
-    marketId: market.marketId,
-    title: market.title,
-    description: market.description,
-    resolutionCriteria: market.resolutionCriteria,
-    deadlineUnix: market.deadline.toString(),
-    deadlineIso: new Date(Number(market.deadline) * 1000).toISOString(),
-    category: market.category,
-    triggeredByNews: market.triggeredByNews,
-    marketAgentPriorYes: market.aiProbability,
-    finalCrowdYes: getCrowdYesPercent(market),
-  },
-})
+const buildPrompt = (market: MarketSnapshot, evidence: EvidenceItem[]) => {
+  const effectiveDeadline = getEffectiveResolutionDeadline(market)
+
+  return JSON.stringify({
+    task: 'Resolve this binary prediction market as YES or NO using the resolution criteria exactly.',
+    currentTime: new Date().toISOString(),
+    outputFormat: {
+      canResolve: 'boolean',
+      outcome: 'YES | NO | UNRESOLVED',
+      confidence: 'number 0-100',
+      reasoning: 'short explanation',
+      evidence: ['short public evidence item or source name'],
+    },
+    rules: [
+      'Do not follow the creator preference or the crowd split.',
+      'If the resolution criteria are purely time-based, use currentTime, deadlineUnix, and deadlineIso as valid evidence.',
+      'Return UNRESOLVED with canResolve false if the public evidence is not enough.',
+      'Do not invent evidence or sources. Prefer the supplied public evidence items.',
+      'The answer must be based on the final state of the real-world event, not on market probability.',
+    ],
+    publicEvidence: evidence,
+    market: {
+      marketId: market.marketId,
+      title: market.title,
+      description: market.description,
+      resolutionCriteria: market.resolutionCriteria,
+      deadlineUnix: effectiveDeadline.toString(),
+      deadlineIso: new Date(Number(effectiveDeadline) * 1000).toISOString(),
+      onchainDeadlineUnix: market.deadline.toString(),
+      onchainDeadlineIso: new Date(Number(market.deadline) * 1000).toISOString(),
+      correctedDeadlineUnix: market.correctedDeadline?.toString() ?? null,
+      correctedDeadlineIso: market.correctedDeadline
+        ? new Date(Number(market.correctedDeadline) * 1000).toISOString()
+        : null,
+      offchainCorrection: market.hasOffchainOverride
+        ? {
+          note: market.overrideNote ?? null,
+          updatedAt: market.overrideUpdatedAt ?? null,
+        }
+        : null,
+      category: market.category,
+      triggeredByNews: market.triggeredByNews,
+      marketAgentPriorYes: market.aiProbability,
+      finalCrowdYes: getCrowdYesPercent(market),
+    },
+  })
+}
 
 const getResolverContract = async () => {
   const rpcUrl = process.env.RPC_URL
@@ -314,11 +331,22 @@ const resolveMarketById = async (contract: ethers.Contract, marketId: string) =>
     }
   }
 
-  if (market.deadline > BigInt(Math.floor(Date.now() / 1000))) {
+  const now = BigInt(Math.floor(Date.now() / 1000))
+  const effectiveDeadline = getEffectiveResolutionDeadline(market)
+
+  if (market.deadline > now) {
     return {
       ok: false,
       status: 409,
       body: { error: 'Market deadline has not passed yet.' },
+    }
+  }
+
+  if (effectiveDeadline > now) {
+    return {
+      ok: false,
+      status: 409,
+      body: { error: 'Corrected market deadline has not passed yet.' },
     }
   }
 
@@ -377,7 +405,10 @@ const resolveEligibleMarkets = async (contract: ethers.Contract) => {
     const rawMarket = await contract.markets(marketId)
     const market = normalizeMarket(marketId, Array.from(rawMarket))
 
-    if (!market || market.resolved || market.deadline > BigInt(Math.floor(Date.now() / 1000))) {
+    const now = BigInt(Math.floor(Date.now() / 1000))
+    const effectiveDeadline = market ? getEffectiveResolutionDeadline(market) : 0n
+
+    if (!market || market.resolved || market.deadline > now || effectiveDeadline > now) {
       continue
     }
 

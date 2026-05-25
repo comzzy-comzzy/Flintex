@@ -12,6 +12,12 @@ import {
   PREDICTION_MARKET_ADDRESS,
   USDC_DECIMALS,
 } from '@/lib/prediction-market'
+import {
+  applyMarketOverride,
+  getEffectiveResolutionDeadline,
+  type MarketOverrideMetadata,
+  type MarketOverrides,
+} from '@/lib/market-overrides'
 
 type BetSide = 'YES' | 'NO' | 'PASS'
 
@@ -32,7 +38,7 @@ type ContractMarket = {
   pool: bigint
   outcome: number
   resolved: boolean
-}
+} & MarketOverrideMetadata
 
 type BetOpportunity = {
   marketId: string
@@ -121,6 +127,19 @@ const formatDeadline = (deadline: bigint) => {
     day: 'numeric',
     year: 'numeric',
   })
+}
+
+const fetchMarketOverrides = async (): Promise<MarketOverrides> => {
+  const response = await fetch('/api/market-overrides', { cache: 'no-store' })
+  if (!response.ok) return {}
+
+  const data = await response.json() as { overrides?: MarketOverrides }
+  return data.overrides ?? {}
+}
+
+const getBetLockDeadline = (market: ContractMarket) => {
+  const effectiveDeadline = getEffectiveResolutionDeadline(market)
+  return effectiveDeadline < market.deadline ? effectiveDeadline : market.deadline
 }
 
 const toBigIntValue = (value: unknown) => (typeof value === 'bigint' ? value : 0n)
@@ -248,7 +267,7 @@ const getMyBetStatus = (market: ContractMarket, position: UserPosition, nowMs: n
     return winningAmount > 0n ? 'Won' : 'Lost'
   }
 
-  return Number(market.deadline) * 1000 <= nowMs ? 'Closed' : 'Open'
+  return Number(getBetLockDeadline(market)) * 1000 <= nowMs ? 'Closed' : 'Open'
 }
 
 const buildOpportunity = (market: ContractMarket, crowdOdds: number): BetOpportunity => {
@@ -272,7 +291,7 @@ const buildOpportunity = (market: ContractMarket, crowdOdds: number): BetOpportu
     expectedValue: round(kelly.expectedValue * 100, 1),
     isHighAlpha,
     recommendation,
-    deadline: market.deadline,
+    deadline: getBetLockDeadline(market),
   }
 }
 
@@ -287,10 +306,27 @@ export default function BetsPage() {
   const [txError, setTxError] = useState<string | null>(null)
   const [txSuccess, setTxSuccess] = useState<string | null>(null)
   const [now, setNow] = useState(() => Date.now())
+  const [marketOverrides, setMarketOverrides] = useState<MarketOverrides>({})
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000)
     return () => window.clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    fetchMarketOverrides()
+      .then((overrides) => {
+        if (!cancelled) setMarketOverrides(overrides)
+      })
+      .catch(() => {
+        if (!cancelled) setMarketOverrides({})
+      })
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const {
@@ -332,8 +368,9 @@ export default function BetsPage() {
     .map((result, index) => (result.status === 'success'
       ? normalizeContractMarket(marketIds[index], result.result)
       : null))
-    .filter((market): market is ContractMarket => market !== null),
-  [marketIds, marketResults])
+    .filter((market): market is ContractMarket => market !== null)
+    .map((market) => applyMarketOverride(market, marketOverrides)),
+  [marketIds, marketOverrides, marketResults])
 
   const markets = useMemo(() => allMarkets
     .filter((market) => !market.resolved),
@@ -677,8 +714,9 @@ export default function BetsPage() {
                         <span>Stake {formatUsdcAmount(totalStaked)}</span>
                         <span>YES {formatUsdcAmount(bet.position.yesAmount)}</span>
                         <span>NO {formatUsdcAmount(bet.position.noAmount)}</span>
-                        <span>Deadline {formatDeadline(bet.market.deadline)}</span>
+                        <span>Deadline {formatDeadline(getEffectiveResolutionDeadline(bet.market))}</span>
                         <span>Outcome {bet.outcomeLabel}</span>
+                        {bet.market.hasOffchainOverride ? <span>Corrected</span> : null}
                       </div>
                     </div>
                     <div className="market-score my-bet-score">
@@ -744,6 +782,7 @@ export default function BetsPage() {
                           {opportunity.side} · Kelly {formatPercent(opportunity.kellySize)}
                           <span className="decay-timer">edge decay {formatCountdown(opportunity.deadline, now)}</span>
                           {opportunity.isHighAlpha ? <span className="alpha-badge">HIGH ALPHA</span> : null}
+                          {market?.hasOffchainOverride ? <span className="spawn-badge">CORRECTED</span> : null}
                         </div>
                         <div className="market-title">{opportunity.title}</div>
                         <button
@@ -802,7 +841,8 @@ export default function BetsPage() {
                     <div>
                       <div className="market-kicker">
                         {market.category || `market #${market.marketId}`}
-                        <span className="decay-timer">edge decay {formatCountdown(market.deadline, now)}</span>
+                        <span className="decay-timer">edge decay {formatCountdown(getBetLockDeadline(market), now)}</span>
+                        {market.hasOffchainOverride ? <span className="spawn-badge">CORRECTED</span> : null}
                       </div>
                       <div className="market-title">{market.title}</div>
                     </div>

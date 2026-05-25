@@ -56,12 +56,35 @@ AI_RESOLVER_PRIVATE_KEY=
 AI_RESOLVER_ADDRESS=
 FREEMODEL_API_KEY=
 NEXT_PUBLIC_PREDICTION_MARKET_ADDRESS=
+MARKET_OVERRIDES_JSON=
+NEXT_PUBLIC_MARKET_OVERRIDES_JSON=
 NEXT_PUBLIC_CIRCLE_KIT_KEY=
 CIRCLE_KIT_KEY=
 CIRCLE_API_KEY=
 ```
 
 Never commit `.env.local`, private keys, API keys, or wallet seed material. `.env.local` and `.env` are ignored by git.
+
+### Off-Chain Market Corrections
+
+Creators cannot edit stored contract fields after `createMarket`. To correct a typo or clarify resolution criteria without redeploying the contract, set `MARKET_OVERRIDES_JSON` in Vercel or `.env.local`:
+
+```json
+{
+  "1": {
+    "title": "Corrected market title",
+    "description": "Corrected description shown in the app.",
+    "resolutionCriteria": "Corrected criteria used by ResolverAgent.",
+    "deadline": "2026-05-25T23:59:59Z",
+    "category": "Macro",
+    "triggeredByNews": "Corrected source context.",
+    "note": "Fixes a typo from the original manual market.",
+    "updatedAt": "2026-05-25T12:00:00Z"
+  }
+}
+```
+
+`MARKET_OVERRIDES_JSON` is server-side and is used by ResolverAgent. `NEXT_PUBLIC_MARKET_OVERRIDES_JSON` is also supported for local display-only overrides, but prefer `MARKET_OVERRIDES_JSON` in production so the API and dashboards read the same corrections.
 
 ## Local Development
 

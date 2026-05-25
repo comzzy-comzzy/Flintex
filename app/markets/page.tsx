@@ -15,6 +15,13 @@ import {
   USDC_ADDRESS,
   USDC_DECIMALS,
 } from '@/lib/prediction-market'
+import {
+  applyMarketOverride,
+  getEffectiveResolutionDeadline,
+  getResolverUnlockDeadline,
+  type MarketOverrideMetadata,
+  type MarketOverrides,
+} from '@/lib/market-overrides'
 
 type MarketSide = 'YES' | 'NO'
 type ScanState = 'READY' | 'SCANNING' | 'COMPLETE' | 'ERROR'
@@ -37,7 +44,7 @@ type ContractMarket = {
   pool: bigint
   outcome: number
   resolved: boolean
-}
+} & MarketOverrideMetadata
 
 type MarketDraft = {
   id: string
@@ -172,7 +179,20 @@ const parseDeadlineTimestamp = (deadline: string) => {
   return Number.isFinite(timestamp) && timestamp > 0 ? BigInt(timestamp) : 0n
 }
 
+const fetchMarketOverrides = async (): Promise<MarketOverrides> => {
+  const response = await fetch('/api/market-overrides', { cache: 'no-store' })
+  if (!response.ok) return {}
+
+  const data = await response.json() as { overrides?: MarketOverrides }
+  return data.overrides ?? {}
+}
+
 const currentUnixSeconds = () => Math.floor(Date.now() / 1000)
+
+const getBetLockDeadline = (market: ContractMarket) => {
+  const effectiveDeadline = getEffectiveResolutionDeadline(market)
+  return effectiveDeadline < market.deadline ? effectiveDeadline : market.deadline
+}
 
 const toBigIntValue = (value: unknown) => (typeof value === 'bigint' ? value : 0n)
 
@@ -308,10 +328,27 @@ export default function MarketsPage() {
   const [approvalHash, setApprovalHash] = useState<string | null>(null)
   const [betHash, setBetHash] = useState<string | null>(null)
   const [nowSeconds, setNowSeconds] = useState(currentUnixSeconds)
+  const [marketOverrides, setMarketOverrides] = useState<MarketOverrides>({})
 
   useEffect(() => {
     const timer = window.setInterval(() => setNowSeconds(currentUnixSeconds()), 30_000)
     return () => window.clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    fetchMarketOverrides()
+      .then((overrides) => {
+        if (!cancelled) setMarketOverrides(overrides)
+      })
+      .catch(() => {
+        if (!cancelled) setMarketOverrides({})
+      })
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const {
@@ -353,8 +390,9 @@ export default function MarketsPage() {
     .map((result, index) => (result.status === 'success'
       ? normalizeContractMarket(marketIds[index], result.result)
       : null))
-    .filter((market): market is ContractMarket => market !== null),
-  [marketIds, marketResults])
+    .filter((market): market is ContractMarket => market !== null)
+    .map((market) => applyMarketOverride(market, marketOverrides)),
+  [marketIds, marketOverrides, marketResults])
 
   const positionReadContracts = useMemo(() => address ? markets.map((market) => ({
     address: PREDICTION_MARKET_ADDRESS,
@@ -657,6 +695,11 @@ export default function MarketsPage() {
   }
 
   const handleBet = (market: ContractMarket, side: MarketSide) => {
+    if (getBetLockDeadline(market) <= BigInt(currentUnixSeconds())) {
+      setTxError('This market is closed for betting.')
+      return
+    }
+
     setTxError(null)
     setTxSuccess(null)
     setBetStep('idle')
@@ -731,8 +774,10 @@ export default function MarketsPage() {
   }
 
   const requestAiResolution = async (market: ContractMarket) => {
-    if (market.deadline > 0n && market.deadline > BigInt(currentUnixSeconds())) {
-      setTxError(`AI resolution unlocks after ${formatDeadlineDateTime(market.deadline)}.`)
+    const resolverUnlockDeadline = getResolverUnlockDeadline(market)
+
+    if (resolverUnlockDeadline > 0n && resolverUnlockDeadline > BigInt(currentUnixSeconds())) {
+      setTxError(`AI resolution unlocks after ${formatDeadlineDateTime(resolverUnlockDeadline)}.`)
       return
     }
 
@@ -868,7 +913,11 @@ export default function MarketsPage() {
                     const userPosition = userPositions.get(market.marketId)
                     const hasUserPosition = !!userPosition && (userPosition.yesAmount > 0n || userPosition.noAmount > 0n)
                     const isCreator = !!address && market.creator.toLowerCase() === address.toLowerCase()
-                    const isClosed = market.deadline > 0n && market.deadline <= BigInt(nowSeconds)
+                    const effectiveDeadline = getEffectiveResolutionDeadline(market)
+                    const betLockDeadline = getBetLockDeadline(market)
+                    const resolverUnlockDeadline = getResolverUnlockDeadline(market)
+                    const isClosed = betLockDeadline > 0n && betLockDeadline <= BigInt(nowSeconds)
+                    const canResolve = resolverUnlockDeadline > 0n && resolverUnlockDeadline <= BigInt(nowSeconds)
                     const canClaim = !!userPosition && market.resolved && !userPosition.claimed && userPosition.payout > 0n
 
                     return (
@@ -876,6 +925,7 @@ export default function MarketsPage() {
                         <div className="active-market-top">
                           <span className="category-badge">{market.category || `Contract #${market.marketId}`}</span>
                           {market.resolved ? <span className="spawn-badge">RESOLVED</span> : null}
+                          {market.hasOffchainOverride ? <span className="spawn-badge">CORRECTED</span> : null}
                           {!market.resolved && isClosed ? <span className="spawn-badge">CLOSED</span> : null}
                           {highAlpha ? <span className="alpha-badge">HIGH ALPHA</span> : null}
                         </div>
@@ -886,7 +936,7 @@ export default function MarketsPage() {
                         <div className="market-card-meta">
                           <div>
                             <span>Deadline</span>
-                            <strong>{formatDeadline(market.deadline)}</strong>
+                            <strong>{formatDeadline(effectiveDeadline)}</strong>
                           </div>
                           <div>
                             <span>Pool</span>
@@ -951,6 +1001,12 @@ export default function MarketsPage() {
 
                         <div className="market-criteria">{market.resolutionCriteria}</div>
                         <div className="market-criteria">{market.triggeredByNews}</div>
+                        {market.hasOffchainOverride ? (
+                          <div className="resolution-review-note">
+                            <span>Off-chain correction</span>
+                            <strong>{market.overrideNote || `Contract deadline remains ${formatDeadlineDateTime(market.deadline)}.`}</strong>
+                          </div>
+                        ) : null}
 
                         <div className="bet-actions">
                           <button className="bet-btn bet-yes" onClick={() => handleBet(market, 'YES')} disabled={market.resolved || isClosed || transactionPending}>
@@ -966,7 +1022,7 @@ export default function MarketsPage() {
                         {isCreator && !market.resolved && !isClosed ? (
                           <div className="resolution-lock">
                             <span>AI resolution locked</span>
-                            <strong>{market.deadline > 0n ? `Unlocks after ${formatDeadlineDateTime(market.deadline)}` : 'Set a deadline before AI resolution.'}</strong>
+                            <strong>{resolverUnlockDeadline > 0n ? `Unlocks after ${formatDeadlineDateTime(resolverUnlockDeadline)}` : 'Set a deadline before AI resolution.'}</strong>
                           </div>
                         ) : null}
 
@@ -974,10 +1030,10 @@ export default function MarketsPage() {
                           <>
                             <div className="resolution-review-note">
                               <span>AI settlement</span>
-                              <strong>The creator cannot choose the result. ResolverAgent checks evidence and signs from the authorized resolver wallet.</strong>
+                              <strong>{canResolve ? 'The creator cannot choose the result. ResolverAgent checks evidence and signs from the authorized resolver wallet.' : `Resolver waits until ${formatDeadlineDateTime(resolverUnlockDeadline)}.`}</strong>
                             </div>
                             <div className="bet-actions">
-                              <button className="simulate-btn" type="button" onClick={() => void requestAiResolution(market)} disabled={transactionPending || resolvingMarketId === market.marketId}>
+                              <button className="simulate-btn" type="button" onClick={() => void requestAiResolution(market)} disabled={!canResolve || transactionPending || resolvingMarketId === market.marketId}>
                                 <CheckCircle2 size={13} aria-hidden="true" />
                                 {resolvingMarketId === market.marketId ? 'Resolving...' : 'Resolve with AI'}
                               </button>
