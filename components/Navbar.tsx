@@ -70,6 +70,9 @@ export default function Navbar() {
         .nav-links a { color: #94a3b8; text-decoration: none; font-size: 13.5px; font-family: 'Geist', sans-serif; transition: color 0.2s; }
         .nav-links a:hover { color: #f0f9ff; }
         .nav-cta { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+        .faucet-link { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 9px; border: 1px solid #0f1e2e; border-radius: 999px; background: rgba(9,13,20,0.72); color: #94a3b8; text-decoration: none; font-family: 'Geist Mono', monospace; font-size: 10px; line-height: 1; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; transition: color 0.2s, border-color 0.2s, background 0.2s; }
+        .faucet-link:hover { color: #67e8f9; border-color: #1e3a4f; background: #0d1520; }
+        .faucet-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: 0.75; flex: 0 0 auto; }
         .menu-toggle { display: none; width: 38px; height: 38px; border: 1px solid #1e3a4f; border-radius: 8px; background: #090d14; color: #f0f9ff; align-items: center; justify-content: center; cursor: pointer; transition: border-color 0.2s, color 0.2s, background 0.2s; }
         .menu-toggle:hover { border-color: #67e8f9; color: #67e8f9; background: #0d1520; }
         .mobile-menu-shell { position: fixed; inset: 0; z-index: 99; pointer-events: none; }
@@ -109,6 +112,12 @@ export default function Navbar() {
           .navbar { padding: 0 14px; }
           .desktop-connect { display: none; }
           .nav-wordmark { font-size: 19px; }
+          .faucet-link { height: 26px; padding: 0 8px; font-size: 9px; letter-spacing: 0.04em; }
+          .faucet-prefix { display: none; }
+        }
+        @media (max-width: 390px) {
+          .faucet-link { padding: 0 7px; }
+          .faucet-dot { display: none; }
         }
       `}</style>
       <nav className={`navbar${scrolled ? ' scrolled' : ''}`}>
@@ -130,6 +139,17 @@ export default function Navbar() {
         </ul>
 
         <div className="nav-cta">
+          <a
+            className="faucet-link"
+            href="https://faucet.circle.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Get testnet USDC from the Circle faucet"
+          >
+            <span className="faucet-dot" aria-hidden="true"></span>
+            <span className="faucet-prefix">Need test USDC?</span>
+            <span>Faucet</span>
+          </a>
           <div className="desktop-connect">
             <ConnectButton showBalance={false} />
           </div>
