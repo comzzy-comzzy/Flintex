@@ -23,7 +23,7 @@ Flintex is now wired to a deployed Arc testnet prediction market contract. The a
 
 - Network: Arc testnet
 - Chain ID: `5042002`
-- PredictionMarket: `0xA9069EB503eFa953e2ce4247c3f637096Dff0240`
+- PredictionMarket: `0xd8996367956337eF9864A8D7C96293b88192a7b6`
 - Testnet USDC: `0x3600000000000000000000000000000000000000`
 - USDC decimals: `6`
 

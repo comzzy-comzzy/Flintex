@@ -69,7 +69,7 @@ async function main() {
     return
   }
 
-  const { RPC_URL, DEPLOYER_PRIVATE_KEY, AI_RESOLVER_ADDRESS } = process.env
+  const { RPC_URL, DEPLOYER_PRIVATE_KEY, AI_RESOLVER_PRIVATE_KEY, AI_RESOLVER_ADDRESS } = process.env
 
   if (!RPC_URL) {
     throw new Error('Missing RPC_URL environment variable')
@@ -79,17 +79,15 @@ async function main() {
     throw new Error('Missing DEPLOYER_PRIVATE_KEY environment variable')
   }
 
-  if (!AI_RESOLVER_ADDRESS) {
-    throw new Error('Missing AI_RESOLVER_ADDRESS environment variable')
-  }
-
   const provider = new ethers.JsonRpcProvider(RPC_URL)
   const wallet = new ethers.Wallet(DEPLOYER_PRIVATE_KEY, provider)
+  const resolverWallet = new ethers.Wallet(AI_RESOLVER_PRIVATE_KEY || DEPLOYER_PRIVATE_KEY)
+  const resolverAddress = AI_RESOLVER_ADDRESS || resolverWallet.address
   const factory = new ethers.ContractFactory(abi, bytecode, wallet)
 
   console.log(`Deploying PredictionMarket from ${wallet.address}`)
-  console.log(`AI resolver: ${AI_RESOLVER_ADDRESS}`)
-  const contract = await factory.deploy(AI_RESOLVER_ADDRESS)
+  console.log(`AI resolver: ${resolverAddress}`)
+  const contract = await factory.deploy(resolverAddress)
   await contract.waitForDeployment()
 
   const address = await contract.getAddress()

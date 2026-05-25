@@ -2,7 +2,7 @@ import predictionMarketArtifact from '@/artifacts/contracts/PredictionMarket.sol
 import type { Abi, Address } from 'viem'
 
 const configuredPredictionMarketAddress = process.env.NEXT_PUBLIC_PREDICTION_MARKET_ADDRESS
-const DEPLOYED_PREDICTION_MARKET_ADDRESS = '0xA9069EB503eFa953e2ce4247c3f637096Dff0240' as Address
+const DEPLOYED_PREDICTION_MARKET_ADDRESS = '0xd8996367956337eF9864A8D7C96293b88192a7b6' as Address
 
 export const ARC_TESTNET_CHAIN_ID = 5042002
 export const USDC_ADDRESS = '0x3600000000000000000000000000000000000000' as Address

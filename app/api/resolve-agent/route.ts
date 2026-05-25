@@ -243,10 +243,10 @@ const buildPrompt = (market: MarketSnapshot, evidence: EvidenceItem[]) => JSON.s
 
 const getResolverContract = async () => {
   const rpcUrl = process.env.RPC_URL
-  const resolverPrivateKey = process.env.AI_RESOLVER_PRIVATE_KEY
+  const resolverPrivateKey = process.env.AI_RESOLVER_PRIVATE_KEY || process.env.DEPLOYER_PRIVATE_KEY
 
   if (!rpcUrl) throw new Error('Missing RPC_URL environment variable.')
-  if (!resolverPrivateKey) throw new Error('Missing AI_RESOLVER_PRIVATE_KEY environment variable.')
+  if (!resolverPrivateKey) throw new Error('Missing AI_RESOLVER_PRIVATE_KEY or DEPLOYER_PRIVATE_KEY environment variable.')
 
   const provider = new ethers.JsonRpcProvider(rpcUrl)
   const wallet = new ethers.Wallet(resolverPrivateKey, provider)
