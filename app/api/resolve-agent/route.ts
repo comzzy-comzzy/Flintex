@@ -251,6 +251,7 @@ const buildPrompt = (market: MarketSnapshot, evidence: EvidenceItem[]) => JSON.s
   },
   rules: [
     'Do not follow the creator preference or the crowd split.',
+    'If the resolution criteria are purely time-based, use currentTime, deadlineUnix, and deadlineIso as valid evidence.',
     'Return UNRESOLVED with canResolve false if the public evidence is not enough.',
     'Do not invent evidence or sources. Prefer the supplied public evidence items.',
     'The answer must be based on the final state of the real-world event, not on market probability.',
