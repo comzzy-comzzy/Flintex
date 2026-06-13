@@ -58,6 +58,10 @@ type MarketDraft = {
   triggeredByNews: string
 }
 
+type AgentErrorResponse = {
+  error?: string
+}
+
 type MarketInput = Omit<MarketDraft, 'id'>
 
 type MarketFormState = {
@@ -185,6 +189,15 @@ const fetchMarketOverrides = async (): Promise<MarketOverrides> => {
 
   const data = await response.json() as { overrides?: MarketOverrides }
   return data.overrides ?? {}
+}
+
+const readAgentError = async (response: Response, fallback: string) => {
+  try {
+    const data = await response.json() as AgentErrorResponse
+    return typeof data.error === 'string' && data.error.trim() ? data.error : fallback
+  } catch {
+    return fallback
+  }
 }
 
 const currentUnixSeconds = () => Math.floor(Date.now() / 1000)
@@ -590,7 +603,7 @@ export default function MarketsPage() {
       })
 
       if (!response.ok) {
-        throw new Error(`MarketAgent failed with ${response.status}`)
+        throw new Error(await readAgentError(response, `MarketAgent failed with ${response.status}`))
       }
 
       const data = await response.json()

@@ -71,6 +71,21 @@ const errorDetails = (error: unknown) => {
   }
 }
 
+const safeProviderMessage = (body: unknown) => {
+  if (typeof body === 'string') return cleanString(body).slice(0, 300)
+  if (!isRecord(body)) return ''
+
+  const nestedError = isRecord(body.error) ? body.error : null
+  const message = cleanString(
+    body.message
+      ?? body.error
+      ?? body.detail
+      ?? nestedError?.message,
+  )
+
+  return message.slice(0, 300)
+}
+
 const extractText = (responseBody: unknown): string => {
   if (typeof responseBody === 'string') return responseBody
   if (Array.isArray(responseBody)) return responseBody.map(extractText).filter(Boolean).join('\n')
@@ -267,10 +282,14 @@ export async function POST() {
     }))
 
     if (!response.ok) {
+      const providerMessage = safeProviderMessage(body)
+
       return NextResponse.json({
-        error: 'FreeModel request failed.',
-        status: response.status,
-        body,
+        error: providerMessage
+          ? `FreeModel request failed with ${response.status}: ${providerMessage}`
+          : `FreeModel request failed with ${response.status}.`,
+        provider: 'FreeModel',
+        upstreamStatus: response.status,
       }, { status: 502 })
     }
 
